@@ -1,51 +1,55 @@
-import React from "react";
+import React, { useState } from "react";
 import { motion, AnimatePresence } from "motion/react";
-import { X } from "lucide-react";
+import { Card } from "./ui/Card";
 
-interface BottomSheetProps {
-  isOpen: boolean;
-  onClose: () => void;
-  title: string;
-  children: React.ReactNode;
+interface StackedCardProps {
+  cards: React.ReactNode[];
 }
 
-export function BottomSheet({ isOpen, onClose, title, children }: BottomSheetProps) {
+export function MobileStackedCards({ cards }: StackedCardProps) {
+  const [currentIndex, setCurrentIndex] = useState(0);
+
+  const handleNext = () => {
+    setCurrentIndex((prev) => (prev + 1) % cards.length);
+  };
+
   return (
-    <AnimatePresence>
-      {isOpen && (
-        <>
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            onClick={onClose}
-            className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50"
-          />
-          <motion.div
-            initial={{ y: "100%" }}
-            animate={{ y: 0 }}
-            exit={{ y: "100%" }}
-            transition={{ type: "spring", damping: 25, stiffness: 200 }}
-            className="fixed bottom-0 left-0 right-0 md:left-1/2 md:-translate-x-1/2 md:w-full md:max-w-md bg-white dark:bg-zinc-950 rounded-t-3xl z-50 shadow-2xl pb-safe flex flex-col max-h-[90vh]"
-          >
-            <div className="flex justify-center pt-3 pb-2 md:hidden">
-              <div className="w-12 h-1.5 bg-zinc-300 dark:bg-zinc-700 rounded-full" />
-            </div>
-            <div className="flex items-center justify-between px-6 pb-4 md:pt-6 border-b border-zinc-100 dark:border-zinc-800">
-              <h2 className="text-xl font-bold">{title}</h2>
-              <button
-                onClick={onClose}
-                className="p-2 rounded-full bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-            <div className="p-6 overflow-y-auto">
-              {children}
-            </div>
-          </motion.div>
-        </>
-      )}
-    </AnimatePresence>
+    <div className="relative h-48 w-full md:hidden mt-8" onClick={handleNext}>
+      <AnimatePresence>
+        {cards.map((card, index) => {
+          // Calculate relative position
+          let relativeIndex = index - currentIndex;
+          if (relativeIndex < 0) relativeIndex += cards.length;
+
+          // Only show top 3 cards
+          if (relativeIndex > 2) return null;
+
+          const isTop = relativeIndex === 0;
+          const scale = 1 - relativeIndex * 0.05;
+          const yOffset = relativeIndex * -16;
+          const zIndex = cards.length - relativeIndex;
+          const opacity = 1 - relativeIndex * 0.2;
+
+          return (
+            <motion.div
+              key={index}
+              initial={{ opacity: 0, scale: 0.8, y: 20 }}
+              animate={{
+                opacity,
+                scale,
+                y: yOffset,
+                zIndex,
+              }}
+              exit={{ opacity: 0, scale: 0.8, y: -20 }}
+              transition={{ type: "spring", stiffness: 300, damping: 20 }}
+              className="absolute top-0 left-0 w-full cursor-pointer"
+              style={{ transformOrigin: "top center" }}
+            >
+              {card}
+            </motion.div>
+          );
+        })}
+      </AnimatePresence>
+    </div>
   );
 }
