@@ -18,6 +18,8 @@ import { useAuth } from "../../contexts/AuthContext";
 import { NotificationsDropdown } from "../NotificationsDropdown";
 import { Button } from "../ui/Button";
 
+import { PromptsManager } from "../PromptsManager";
+
 const navItems = [
   { path: "/", label: "Dashboard", icon: LayoutDashboard },
   { path: "/dtr", label: "DTR", icon: Clock },
@@ -56,6 +58,8 @@ export function Layout() {
         <div className="absolute top-[20%] -right-[10%] w-[40%] h-[40%] bg-purple-500/10 dark:bg-purple-500/5 rounded-full blur-3xl mix-blend-multiply dark:mix-blend-screen animate-blob animation-delay-2000"></div>
         <div className="absolute -bottom-[10%] left-[20%] w-[40%] h-[40%] bg-pink-500/10 dark:bg-pink-500/5 rounded-full blur-3xl mix-blend-multiply dark:mix-blend-screen animate-blob animation-delay-4000"></div>
       </div>
+
+      <PromptsManager />
 
       {/* Sidebar (Desktop) */}
       <aside className="w-64 flex-shrink-0 glass z-20 flex-col hidden md:flex m-4 rounded-3xl overflow-hidden">
@@ -183,13 +187,21 @@ export function Layout() {
                 className="fixed inset-0 bg-black/50 backdrop-blur-sm z-40 md:hidden"
               />
               <motion.aside
-                initial={{ x: "100%" }}
+                initial={{ x: "-100%" }}
                 animate={{ x: 0 }}
-                exit={{ x: "100%" }}
+                exit={{ x: "-100%" }}
                 transition={{ type: "spring", damping: 25, stiffness: 200 }}
-                className="fixed top-0 right-0 bottom-0 w-4/5 max-w-sm bg-white dark:bg-zinc-950 z-50 flex flex-col shadow-2xl md:hidden"
+                className="fixed top-0 left-0 bottom-0 w-4/5 max-w-sm bg-white dark:bg-zinc-950 z-50 flex flex-col shadow-2xl md:hidden"
               >
-                <div className="p-4 flex justify-end border-b border-zinc-100 dark:border-zinc-800">
+                <div className="p-4 flex justify-between items-center border-b border-zinc-100 dark:border-zinc-800">
+                  <div className="flex items-center gap-2">
+                    <div className="w-8 h-8 bg-indigo-100 dark:bg-indigo-900/50 rounded-xl flex items-center justify-center text-indigo-600 dark:text-indigo-400">
+                      <Clock className="w-5 h-5" />
+                    </div>
+                    <h2 className="text-xl font-bold tracking-tight text-indigo-600 dark:text-indigo-400">
+                      LanTrack
+                    </h2>
+                  </div>
                   <button
                     onClick={() => setIsMobileMenuOpen(false)}
                     className="p-2 rounded-xl bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400"
