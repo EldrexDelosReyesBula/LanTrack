@@ -29,6 +29,7 @@ import {
 import { format } from "date-fns";
 import { useAuth } from "../contexts/AuthContext";
 import { useToast } from "../contexts/ToastContext";
+import { createNotification } from "../utils/notifications";
 import { db } from "../lib/firebase";
 import { Card } from "../components/ui/Card";
 import { Button } from "../components/ui/Button";
@@ -57,6 +58,8 @@ export function DTR() {
   // Clock out modal state
   const [showClockOutModal, setShowClockOutModal] = useState(false);
   const [clockOutCountdown, setClockOutCountdown] = useState(5);
+
+  const [clockStatus, setClockStatus] = useState<"not_checked_in" | "running" | "paused" | "stopped">("not_checked_in");
 
   useEffect(() => {
     const timer = setInterval(() => setCurrentTime(new Date()), 1000);
@@ -91,9 +94,13 @@ export function DTR() {
         
         let hours = 0;
         let activeRecord = null;
+        let lastRecord: any = null;
         
         snapAll.forEach((doc) => {
           const data = doc.data();
+          if (!lastRecord || data.clockIn > lastRecord.clockIn) {
+             lastRecord = data;
+          }
           if (data.clockOut) {
             const inTime = new Date(`${data.date}T${data.clockIn}`);
             const outTime = new Date(`${data.date}T${data.clockOut}`);
@@ -107,6 +114,7 @@ export function DTR() {
 
         if (activeRecord) {
           setIsClockedIn(true);
+          setClockStatus("running");
           setCurrentRecordId(activeRecord.id);
           setClockInTime(new Date(`${activeRecord.date}T${activeRecord.clockIn}`));
           setNotes(activeRecord.notes || "");
@@ -114,6 +122,12 @@ export function DTR() {
           setVisibility(activeRecord.visibility || "private");
           setTags(activeRecord.tags || []);
           setPartnerId(activeRecord.partnerId || "");
+        } else if (lastRecord) {
+          setIsClockedIn(false);
+          setClockStatus(lastRecord.endReason === "pause" ? "paused" : "stopped");
+        } else {
+          setIsClockedIn(false);
+          setClockStatus("not_checked_in");
         }
       } catch (error) {
         console.error("Error checking status:", error);
@@ -139,6 +153,15 @@ export function DTR() {
         audio.play().catch(e => console.error("Error playing alarm:", e));
         setAlarmPlayed(true);
         showToast("Daily time goal reached!", "success");
+        
+        if (user) {
+          createNotification(user.uid, {
+            title: "Goal Reached! 🎉",
+            message: `You've reached your daily goal of ${user.dailyGoalHours} hours. Great job!`,
+            type: "success",
+            link: "/dashboard"
+          });
+        }
       }
     }
   }, [currentTime, isClockedIn, clockInTime, totalTodayHours, user, alarmPlayed, showToast]);
@@ -164,6 +187,7 @@ export function DTR() {
       const docRef = await addDoc(dtrRef, newRecord);
       setCurrentRecordId(docRef.id);
       setIsClockedIn(true);
+      setClockStatus("running");
       setClockInTime(now);
       setTags([]);
       showToast("Successfully clocked in", "success");
@@ -194,6 +218,7 @@ export function DTR() {
         visibility,
         tags,
         partnerId: partnerId || null,
+        endReason: action,
       });
 
       if (clockInTime) {
@@ -202,6 +227,7 @@ export function DTR() {
       }
 
       setIsClockedIn(false);
+      setClockStatus(action === "pause" ? "paused" : "stopped");
       setCurrentRecordId(null);
       setClockInTime(null);
       setNotes("");
@@ -317,6 +343,32 @@ export function DTR() {
         </AnimatePresence>
 
         <div className="relative z-10 flex flex-col items-center">
+          <div className="mb-6">
+            {clockStatus === "not_checked_in" && (
+              <span className="px-4 py-1.5 bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400 rounded-full text-sm font-medium">
+                Not Checked In
+              </span>
+            )}
+            {clockStatus === "running" && (
+              <span className="px-4 py-1.5 bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400 rounded-full text-sm font-medium flex items-center gap-2">
+                <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+                Running
+              </span>
+            )}
+            {clockStatus === "paused" && (
+              <span className="px-4 py-1.5 bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400 rounded-full text-sm font-medium flex items-center gap-2">
+                <Pause className="w-3 h-3" />
+                Paused
+              </span>
+            )}
+            {clockStatus === "stopped" && (
+              <span className="px-4 py-1.5 bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-400 rounded-full text-sm font-medium flex items-center gap-2">
+                <Square className="w-3 h-3" />
+                Stopped
+              </span>
+            )}
+          </div>
+
           {user?.clockType === "analog" ? (
             <div className="relative w-48 h-48 md:w-64 md:h-64 rounded-full border-4 border-zinc-200 dark:border-zinc-800 flex items-center justify-center mb-8 bg-white dark:bg-zinc-900 shadow-inner mx-auto">
               {/* Clock face markers */}

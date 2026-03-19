@@ -4,9 +4,11 @@ import { motion } from "motion/react";
 import { LogIn, Mail, Lock } from "lucide-react";
 import { useAuth } from "../contexts/AuthContext";
 import { useToast } from "../contexts/ToastContext";
+import { createNotification } from "../utils/notifications";
 import { Button } from "../components/ui/Button";
 import { Card } from "../components/ui/Card";
 import { AuthBackground } from "../components/AuthBackground";
+import { LegalLinks } from "../components/LegalDocuments";
 
 export function Login() {
   const { user, signInWithGoogle, signInWithEmail, isConfigured } = useAuth();
@@ -61,8 +63,17 @@ export function Login() {
     try {
       setIsLoading(true);
       setError(null);
-      await signInWithGoogle();
+      const userCredential = await signInWithGoogle();
       showToast("Successfully logged in with Google", "success");
+      
+      if (userCredential?.user && userCredential.isNewUser) {
+        await createNotification(userCredential.user.uid, {
+          title: "Welcome to LanTrack!",
+          message: "We're excited to have you on board. Start tracking your time and boosting your productivity.",
+          type: "success",
+          link: "/dtr"
+        });
+      }
     } catch (err: any) {
       console.error(err);
       const friendlyMessage = getFriendlyErrorMessage(err);
@@ -213,6 +224,10 @@ export function Login() {
               Sign up
             </Link>
           </p>
+
+          <div className="mt-8 pt-6 border-t border-zinc-100 dark:border-zinc-800">
+            <LegalLinks mode="footer" />
+          </div>
         </Card>
       </motion.div>
     </div>

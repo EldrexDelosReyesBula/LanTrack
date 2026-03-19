@@ -25,6 +25,9 @@ import {
 import { motion, AnimatePresence } from "motion/react";
 import { Card } from "../components/ui/Card";
 import { Button } from "../components/ui/Button";
+import { BottomSheet } from "../components/ui/BottomSheet";
+import Markdown from "react-markdown";
+import remarkGfm from "remark-gfm";
 import {
   X,
   Calendar as CalendarIcon,
@@ -217,95 +220,93 @@ export function Calendar() {
         />
       </Card>
 
-      <AnimatePresence>
+      <BottomSheet
+        isOpen={!!selectedEvent}
+        onClose={() => setSelectedEvent(null)}
+        title={selectedEvent?.title || "Event Details"}
+      >
         {selectedEvent && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm"
-            onClick={() => setSelectedEvent(null)}
-          >
-            <motion.div
-              initial={{ scale: 0.95, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              exit={{ scale: 0.95, opacity: 0 }}
-              onClick={(e) => e.stopPropagation()}
-              className="w-full max-w-md bg-white dark:bg-zinc-900 rounded-2xl shadow-xl overflow-hidden"
+          <div className="space-y-6">
+            <div
+              className={`p-4 rounded-xl text-white ${
+                selectedEvent.type === "admin"
+                  ? "bg-blue-500"
+                  : selectedEvent.type === "personal"
+                    ? "bg-emerald-500"
+                    : selectedEvent.status === "completed"
+                      ? "bg-zinc-500"
+                      : "bg-amber-500"
+              }`}
             >
-              <div
-                className={`p-6 text-white ${
-                  selectedEvent.type === "admin"
-                    ? "bg-blue-500"
-                    : selectedEvent.type === "personal"
-                      ? "bg-emerald-500"
-                      : selectedEvent.status === "completed"
-                        ? "bg-zinc-500"
-                        : "bg-amber-500"
-                }`}
-              >
-                <div className="flex justify-between items-start mb-4">
-                  <div className="uppercase tracking-wider text-xs font-bold opacity-80">
-                    {selectedEvent.type} Event
-                  </div>
-                  <button
-                    onClick={() => setSelectedEvent(null)}
-                    className="opacity-70 hover:opacity-100 transition-opacity"
-                  >
-                    <X className="w-5 h-5" />
-                  </button>
+              <div className="uppercase tracking-wider text-xs font-bold opacity-90 mb-1">
+                {selectedEvent.type} Event
+              </div>
+              <h2 className="text-xl font-bold">{selectedEvent.title}</h2>
+            </div>
+
+            <div className="space-y-4">
+              <div className="flex items-center gap-3 text-zinc-600 dark:text-zinc-300">
+                <CalendarIcon className="w-5 h-5 text-zinc-400" />
+                <div>
+                  <p className="text-sm font-medium">Date</p>
+                  <p className="text-sm">
+                    {format(selectedEvent.start, "PPP")}
+                  </p>
                 </div>
-                <h2 className="text-2xl font-bold">{selectedEvent.title}</h2>
               </div>
 
-              <div className="p-6 space-y-4">
+              {!selectedEvent.allDay && (
                 <div className="flex items-center gap-3 text-zinc-600 dark:text-zinc-300">
-                  <CalendarIcon className="w-5 h-5 text-zinc-400" />
+                  <Clock className="w-5 h-5 text-zinc-400" />
                   <div>
-                    <p className="text-sm font-medium">Date</p>
+                    <p className="text-sm font-medium">Time</p>
                     <p className="text-sm">
-                      {format(selectedEvent.start, "PPP")}
+                      {format(selectedEvent.start, "p")} -{" "}
+                      {format(selectedEvent.end, "p")}
                     </p>
                   </div>
                 </div>
+              )}
 
-                {!selectedEvent.allDay && (
-                  <div className="flex items-center gap-3 text-zinc-600 dark:text-zinc-300">
-                    <Clock className="w-5 h-5 text-zinc-400" />
-                    <div>
-                      <p className="text-sm font-medium">Time</p>
-                      <p className="text-sm">
-                        {format(selectedEvent.start, "p")} -{" "}
-                        {format(selectedEvent.end, "p")}
-                      </p>
-                    </div>
-                  </div>
-                )}
-
-                {selectedEvent.resource?.description && (
-                  <div className="mt-4 pt-4 border-t border-zinc-100 dark:border-zinc-800">
-                    <p className="text-sm font-medium text-zinc-900 dark:text-zinc-100 mb-1">
-                      Description
-                    </p>
-                    <p className="text-sm text-zinc-600 dark:text-zinc-400">
+              {selectedEvent.resource?.description && (
+                <div className="mt-4 pt-4 border-t border-zinc-100 dark:border-zinc-800">
+                  <p className="text-sm font-medium text-zinc-900 dark:text-zinc-100 mb-2">
+                    Description
+                  </p>
+                  <div className="text-sm text-zinc-600 dark:text-zinc-400 space-y-2">
+                    <Markdown
+                      remarkPlugins={[remarkGfm]}
+                      components={{
+                        h1: ({ node, ...props }) => <h1 className="text-lg font-bold text-zinc-900 dark:text-zinc-100 mt-4 mb-2" {...props} />,
+                        h2: ({ node, ...props }) => <h2 className="text-base font-semibold text-zinc-900 dark:text-zinc-100 mt-3 mb-2" {...props} />,
+                        h3: ({ node, ...props }) => <h3 className="text-sm font-medium text-zinc-900 dark:text-zinc-100 mt-2 mb-1" {...props} />,
+                        p: ({ node, ...props }) => <p className="leading-relaxed mb-2" {...props} />,
+                        ul: ({ node, ...props }) => <ul className="list-disc pl-5 mb-2 space-y-1" {...props} />,
+                        ol: ({ node, ...props }) => <ol className="list-decimal pl-5 mb-2 space-y-1" {...props} />,
+                        li: ({ node, ...props }) => <li className="leading-relaxed" {...props} />,
+                        a: ({ node, ...props }) => <a className="text-indigo-600 dark:text-indigo-400 hover:underline" {...props} />,
+                        strong: ({ node, ...props }) => <strong className="font-semibold text-zinc-900 dark:text-zinc-100" {...props} />,
+                      }}
+                    >
                       {selectedEvent.resource.description}
-                    </p>
+                    </Markdown>
                   </div>
-                )}
-              </div>
+                </div>
+              )}
+            </div>
 
-              <div className="p-4 bg-zinc-50 dark:bg-zinc-900/50 border-t border-zinc-100 dark:border-zinc-800 flex justify-end">
-                <Button
-                  variant="outline"
-                  onClick={() => setSelectedEvent(null)}
-                >
-                  Close
-                </Button>
-              </div>
-            </motion.div>
-          </motion.div>
+            <div className="pt-4 flex justify-end">
+              <Button
+                variant="outline"
+                onClick={() => setSelectedEvent(null)}
+                className="w-full md:w-auto"
+              >
+                Close
+              </Button>
+            </div>
+          </div>
         )}
-      </AnimatePresence>
+      </BottomSheet>
     </div>
   );
 }

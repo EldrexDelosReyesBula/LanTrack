@@ -13,6 +13,7 @@ import {
   ChevronRight,
   ArrowLeft,
   X,
+  Heart,
 } from "lucide-react";
 import { useAuth } from "../contexts/AuthContext";
 import { useTheme } from "../contexts/ThemeContext";
@@ -23,6 +24,7 @@ import { doc, updateDoc } from "firebase/firestore";
 import { Card } from "../components/ui/Card";
 import { Button } from "../components/ui/Button";
 import { BottomSheet } from "../components/ui/BottomSheet";
+import { LegalDocuments } from "../components/LegalDocuments";
 
 export function Settings() {
   const { user, updateUserPassword, updateUserEmail } = useAuth();
@@ -40,6 +42,7 @@ export function Settings() {
     | "security"
     | "automation"
     | "goals"
+    | "legal"
   >("menu");
   const [isPasswordSheetOpen, setIsPasswordSheetOpen] = useState(false);
   const [isEmailSheetOpen, setIsEmailSheetOpen] = useState(false);
@@ -911,6 +914,41 @@ export function Settings() {
     </div>
   );
 
+  const renderLegalContent = () => (
+    <div className="space-y-6">
+      <Card className="p-6">
+        <h2 className="text-xl font-semibold mb-6">Legal & Support</h2>
+        <div className="space-y-4">
+          <p className="text-zinc-500 dark:text-zinc-400">
+            Review our legal documents and support the development of LanTrack.
+          </p>
+          <div className="space-y-2">
+            <Button
+              variant="secondary"
+              className="w-full justify-start"
+              onClick={() => {
+                const legalDocs = document.getElementById("legal-docs-trigger");
+                if (legalDocs) legalDocs.click();
+              }}
+            >
+              <Shield className="w-4 h-4 mr-2" />
+              View Legal Documents
+            </Button>
+            <Button
+              variant="secondary"
+              className="w-full justify-start"
+              onClick={() => window.open("https://ko-fi.com/landecsorg", "_blank")}
+            >
+              <Heart className="w-4 h-4 mr-2 text-rose-500" />
+              Support LanTrack
+            </Button>
+          </div>
+        </div>
+      </Card>
+      <LegalDocuments />
+    </div>
+  );
+
   return (
     <div className="max-w-4xl mx-auto space-y-6">
       <header className="mb-8 hidden md:block">
@@ -969,6 +1007,12 @@ export function Settings() {
                   label: "Goals & Preferences",
                   desc: "Time goals, partners, and tags",
                 },
+                {
+                  id: "legal",
+                  icon: Shield,
+                  label: "Legal & Support",
+                  desc: "Privacy, terms, and donations",
+                },
               ].map((item) => (
                 <button
                   key={item.id}
@@ -1018,6 +1062,7 @@ export function Settings() {
               {mobileActiveView === "security" && renderSecurityContent()}
               {mobileActiveView === "automation" && renderAutomationContent()}
               {mobileActiveView === "goals" && renderGoalsContent()}
+              {mobileActiveView === "legal" && renderLegalContent()}
             </div>
           </motion.div>
         )}
@@ -1033,6 +1078,7 @@ export function Settings() {
               { id: "security", icon: Shield, label: "Security" },
               { id: "automation", icon: Clock, label: "Automation" },
               { id: "goals", icon: CheckCircle2, label: "Goals & Prefs" },
+              { id: "legal", icon: Shield, label: "Legal & Support" },
             ].map((item) => (
               <button
                 key={item.id}
@@ -1102,6 +1148,15 @@ export function Settings() {
               animate={{ opacity: 1, y: 0 }}
             >
               {renderGoalsContent()}
+            </motion.div>
+          )}
+
+          {activeTab === "legal" && (
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+            >
+              {renderLegalContent()}
             </motion.div>
           )}
         </div>

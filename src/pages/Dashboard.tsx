@@ -7,15 +7,20 @@ import {
   Link as LinkIcon,
   ArrowRight,
   CheckSquare,
-  Calendar as CalendarIcon
+  Calendar as CalendarIcon,
+  Flame,
+  TrendingUp,
+  AlertCircle
 } from "lucide-react";
 import {
   collection,
   query,
   where,
   getDocs,
+  orderBy,
+  limit
 } from "firebase/firestore";
-import { format, startOfWeek, endOfWeek, startOfDay, endOfDay } from "date-fns";
+import { format, startOfWeek, endOfWeek, startOfDay, endOfDay, subDays, differenceInDays } from "date-fns";
 import { useAuth } from "../contexts/AuthContext";
 import { useNotification } from "../contexts/NotificationContext";
 import { db } from "../lib/firebase";
@@ -32,6 +37,8 @@ interface DashboardStats {
   upcomingSchedules: any[];
   dailyGoal: number;
   weeklyGoal: number;
+  streak: number;
+  lastActive: Date | null;
 }
 
 export function Dashboard() {
@@ -45,6 +52,8 @@ export function Dashboard() {
     upcomingSchedules: [],
     dailyGoal: 8,
     weeklyGoal: 40,
+    streak: 0,
+    lastActive: null,
   });
   const [loading, setLoading] = useState(true);
 
@@ -106,6 +115,49 @@ export function Dashboard() {
           }
         });
 
+        // Calculate Streak
+        const recentLogsQuery = query(
+          dtrRef,
+          where("userId", "==", user.uid),
+          orderBy("date", "desc"),
+          limit(30)
+        );
+        const recentLogsSnap = await getDocs(recentLogsQuery);
+        
+        let currentStreak = 0;
+        let lastActiveDate: Date | null = null;
+        
+        if (!recentLogsSnap.empty) {
+          const dates = recentLogsSnap.docs.map(doc => new Date(doc.data().date));
+          // Sort descending
+          dates.sort((a, b) => b.getTime() - a.getTime());
+          
+          lastActiveDate = dates[0];
+          
+          // Check if active today or yesterday to maintain streak
+          const daysSinceLastActive = differenceInDays(startOfDay(now), startOfDay(lastActiveDate));
+          
+          if (daysSinceLastActive <= 1) {
+            currentStreak = 1;
+            let checkDate = startOfDay(lastActiveDate);
+            
+            for (let i = 1; i < dates.length; i++) {
+              const prevDate = startOfDay(dates[i]);
+              const diff = differenceInDays(checkDate, prevDate);
+              
+              if (diff === 1) {
+                currentStreak++;
+                checkDate = prevDate;
+              } else if (diff === 0) {
+                // Same day, ignore
+              } else {
+                // Streak broken
+                break;
+              }
+            }
+          }
+        }
+
         // Fetch upcoming tasks
         const tasksRef = collection(db, `users/${user.uid}/tasks`);
         
@@ -134,6 +186,8 @@ export function Dashboard() {
           upcomingSchedules: schedules.slice(0, 3),
           dailyGoal: user.dailyGoalHours || 8,
           weeklyGoal: user.weeklyGoalHours || 40,
+          streak: currentStreak,
+          lastActive: lastActiveDate,
         });
       } catch (error) {
         console.error("Error fetching stats:", error);
@@ -167,14 +221,14 @@ export function Dashboard() {
       progressColor: "bg-indigo-500",
     },
     {
-      title: "Pending Approvals",
-      value: stats.pendingApprovals.toString(),
-      subValue: "Awaiting review",
-      progress: 0,
-      icon: CheckCircle,
-      color: "text-amber-600 dark:text-amber-400",
-      bg: "bg-amber-500/10 dark:bg-amber-500/20",
-      progressColor: "bg-amber-500",
+      title: "Activity Streak",
+      value: `${stats.streak} Days`,
+      subValue: stats.streak > 0 ? "Keep the momentum going!" : "Start your streak today!",
+      progress: Math.min((stats.streak / 7) * 100, 100), // Visual progress towards a 7-day streak
+      icon: Flame,
+      color: "text-orange-500 dark:text-orange-400",
+      bg: "bg-orange-500/10 dark:bg-orange-500/20",
+      progressColor: "bg-orange-500",
     },
   ];
 
@@ -219,6 +273,28 @@ export function Dashboard() {
         </motion.p>
       </header>
 
+      {/* Gamified Insight Banner */}
+      {!loading && stats.lastActive && differenceInDays(startOfDay(new Date()), startOfDay(stats.lastActive)) > 2 && (
+        <motion.div
+          initial={{ opacity: 0, scale: 0.95 }}
+          animate={{ opacity: 1, scale: 1 }}
+          className="bg-orange-50 dark:bg-orange-900/20 border border-orange-200 dark:border-orange-800/30 p-4 rounded-2xl flex items-start gap-4 mb-8 relative overflow-hidden"
+        >
+          <div className="absolute top-0 right-0 -mt-4 -mr-4 w-24 h-24 bg-orange-500/10 dark:bg-orange-500/20 rounded-full blur-2xl pointer-events-none" />
+          <div className="w-12 h-12 rounded-full bg-orange-100 dark:bg-orange-900/50 flex items-center justify-center flex-shrink-0 z-10">
+            <AlertCircle className="w-6 h-6 text-orange-600 dark:text-orange-400" />
+          </div>
+          <div className="z-10">
+            <h3 className="text-lg font-bold text-orange-900 dark:text-orange-100 mb-1">
+              We missed you!
+            </h3>
+            <p className="text-orange-800 dark:text-orange-200 text-sm leading-relaxed">
+              It looks like you haven't checked in for a few days. Don't worry, every day is a new opportunity to build your streak. Let's get back on track!
+            </p>
+          </div>
+        </motion.div>
+      )}
+
       {/* Mobile Stacked Cards */}
       <div className="md:hidden mb-12">
         <MobileStackedCards
@@ -248,13 +324,6 @@ export function Dashboard() {
                     <div className={`h-full rounded-full ${stat.progressColor}`} style={{ width: `${stat.progress}%` }} />
                   </div>
                   <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-2 font-medium">
-                    {stat.subValue}
-                  </p>
-                </div>
-              )}
-              {stat.progress === 0 && stat.title === "Pending Approvals" && (
-                <div className="mt-auto pt-2">
-                   <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-2 font-medium">
                     {stat.subValue}
                   </p>
                 </div>
@@ -307,13 +376,6 @@ export function Dashboard() {
                     />
                   </div>
                   <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-2 font-medium">
-                    {stat.subValue}
-                  </p>
-                </div>
-              )}
-              {stat.progress === 0 && stat.title === "Pending Approvals" && (
-                <div className="mt-auto pt-2">
-                   <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-2 font-medium">
                     {stat.subValue}
                   </p>
                 </div>

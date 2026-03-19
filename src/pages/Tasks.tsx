@@ -5,6 +5,7 @@ import { collection, query, where, getDocs, addDoc, updateDoc, doc, orderBy, get
 import { format } from "date-fns";
 import { useAuth } from "../contexts/AuthContext";
 import { useToast } from "../contexts/ToastContext";
+import { createNotification } from "../utils/notifications";
 import { db } from "../lib/firebase";
 import { Card } from "../components/ui/Card";
 import { Button } from "../components/ui/Button";
@@ -150,6 +151,18 @@ export function Tasks() {
       setTasks(tasks.map(t => t.id === taskId ? { ...t, status: newStatus as any } : t));
       showToast(`Task marked as ${newStatus.replace('_', ' ')}`, "success");
       setTaskToComplete(null);
+      
+      if (newStatus === "completed") {
+        const task = tasks.find(t => t.id === taskId);
+        if (task) {
+          createNotification(user.uid, {
+            title: "Task Completed! ✅",
+            message: `You've completed the task: ${task.title}`,
+            type: "success",
+            link: "/tasks"
+          });
+        }
+      }
     } catch (error: any) {
       console.error("Error updating task:", error);
       showToast(error.message || "Failed to update task", "error");

@@ -6,8 +6,10 @@ import { useAuth } from "../contexts/AuthContext";
 import { useToast } from "../contexts/ToastContext";
 import { Button } from "../components/ui/Button";
 import { Card } from "../components/ui/Card";
-
 import { AuthBackground } from "../components/AuthBackground";
+import { LegalLinks } from "../components/LegalDocuments";
+
+import { createNotification } from "../utils/notifications";
 
 export function SignUp() {
   const { user, signUpWithEmail, signInWithGoogle, isConfigured } = useAuth();
@@ -21,6 +23,7 @@ export function SignUp() {
 
   const [step, setStep] = useState(1);
   const [birthdate, setBirthdate] = useState("");
+  const [agreedToTerms, setAgreedToTerms] = useState(false);
 
   if (!isConfigured) {
     return <Navigate to="/setup" replace />;
@@ -89,8 +92,17 @@ export function SignUp() {
     try {
       setIsLoading(true);
       setError(null);
-      await signUpWithEmail(email, password, name);
+      const userCredential = await signUpWithEmail(email, password, name);
       showToast("Account created successfully", "success");
+      
+      if (userCredential?.user) {
+        await createNotification(userCredential.user.uid, {
+          title: "Welcome to LanTrack!",
+          message: "We're excited to have you on board. Start tracking your time and boosting your productivity.",
+          type: "success",
+          link: "/dtr"
+        });
+      }
     } catch (err: any) {
       console.error(err);
       const friendlyMessage = getFriendlyErrorMessage(err);
@@ -105,8 +117,17 @@ export function SignUp() {
     try {
       setIsLoading(true);
       setError(null);
-      await signInWithGoogle();
+      const userCredential = await signInWithGoogle();
       showToast("Successfully signed up with Google", "success");
+      
+      if (userCredential?.user && userCredential.isNewUser) {
+        await createNotification(userCredential.user.uid, {
+          title: "Welcome to LanTrack!",
+          message: "We're excited to have you on board. Start tracking your time and boosting your productivity.",
+          type: "success",
+          link: "/dtr"
+        });
+      }
     } catch (err: any) {
       console.error(err);
       const friendlyMessage = getFriendlyErrorMessage(err);
@@ -281,13 +302,29 @@ export function SignUp() {
                     </div>
                   </div>
 
-                  <div className="flex gap-3">
+                  <div className="flex items-start gap-3 mt-2">
+                    <div className="flex items-center h-5">
+                      <input
+                        id="terms"
+                        type="checkbox"
+                        checked={agreedToTerms}
+                        onChange={(e) => setAgreedToTerms(e.target.checked)}
+                        className="w-4 h-4 border border-zinc-300 rounded bg-zinc-50 focus:ring-3 focus:ring-indigo-300 dark:bg-zinc-700 dark:border-zinc-600 dark:focus:ring-indigo-600 dark:ring-offset-zinc-800"
+                        required
+                      />
+                    </div>
+                    <label htmlFor="terms" className="text-sm font-medium text-zinc-900 dark:text-zinc-300">
+                      I agree to the <span className="text-indigo-600 dark:text-indigo-400">Terms of Use</span> and <span className="text-indigo-600 dark:text-indigo-400">Privacy Policy</span>.
+                    </label>
+                  </div>
+
+                  <div className="flex gap-3 mt-4">
                     <Button type="button" variant="outline" onClick={prevStep} className="w-full py-3.5 rounded-2xl text-base font-semibold">
                       Back
                     </Button>
                     <Button
                       type="submit"
-                      disabled={isLoading}
+                      disabled={isLoading || !agreedToTerms}
                       className="w-full py-3.5 rounded-2xl text-base font-semibold shadow-md shadow-indigo-500/20 hover:shadow-lg hover:shadow-indigo-500/30 transition-all active:scale-[0.98]"
                     >
                       {isLoading ? (
@@ -349,6 +386,10 @@ export function SignUp() {
               Sign in
             </Link>
           </p>
+
+          <div className="mt-8 pt-6 border-t border-zinc-100 dark:border-zinc-800">
+            <LegalLinks mode="footer" />
+          </div>
         </Card>
       </motion.div>
     </div>
