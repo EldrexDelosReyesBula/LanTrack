@@ -46,8 +46,8 @@ interface AppUser {
 interface AuthContextType {
   user: AppUser | null;
   loading: boolean;
-  signInWithGoogle: () => Promise<void>;
-  signUpWithEmail: (email: string, password: string, name: string) => Promise<void>;
+  signInWithGoogle: () => Promise<any>;
+  signUpWithEmail: (email: string, password: string, name: string) => Promise<any>;
   signInWithEmail: (email: string, password: string) => Promise<void>;
   resetPassword: (email: string) => Promise<void>;
   updateUserPassword: (currentPassword: string, newPassword: string) => Promise<void>;
@@ -132,6 +132,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       await setDoc(userRef, appUser);
       setUser(appUser);
     }
+    return { ...result, isNewUser: !userSnap.exists() };
   };
 
   const signUpWithEmail = async (email: string, password: string, name: string) => {
@@ -156,6 +157,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     };
     await setDoc(userRef, appUser);
     setUser(appUser);
+    return userCredential;
   };
 
   const signInWithEmail = async (email: string, password: string) => {
