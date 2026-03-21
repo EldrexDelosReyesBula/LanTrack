@@ -13,7 +13,9 @@ import {
   FileText,
   Table,
   FileSpreadsheet,
-  Printer
+  Printer,
+  Trash2,
+  AlertTriangle
 } from "lucide-react";
 import {
   collection,
@@ -24,6 +26,8 @@ import {
   doc,
   getDoc,
   updateDoc,
+  deleteDoc,
+  writeBatch,
 } from "firebase/firestore";
 import { format, parseISO, isWithinInterval } from "date-fns";
 import jsPDF from "jspdf";
@@ -51,6 +55,9 @@ export function History() {
   const { showToast } = useToast();
   const [records, setRecords] = useState<DTRRecord[]>([]);
   const [loading, setLoading] = useState(true);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [recordToDelete, setRecordToDelete] = useState<string | null>(null);
+  const [showClearAllConfirm, setShowClearAllConfirm] = useState(false);
 
   // Advanced filters
   const [showFilters, setShowFilters] = useState(false);
@@ -210,6 +217,43 @@ export function History() {
     setShowExportMenu(false);
   };
 
+  const handleDeleteRecord = async (id: string) => {
+    if (!user || !db) return;
+    setIsDeleting(true);
+    try {
+      await deleteDoc(doc(db, `users/${user.uid}/logs`, id));
+      setRecords(records.filter((r) => r.id !== id));
+      showToast("Record deleted successfully", "success");
+    } catch (error) {
+      console.error("Error deleting record:", error);
+      showToast("Failed to delete record", "error");
+    } finally {
+      setIsDeleting(false);
+      setRecordToDelete(null);
+    }
+  };
+
+  const handleClearAllHistory = async () => {
+    if (!user || !db) return;
+    setIsDeleting(true);
+    try {
+      const batch = writeBatch(db);
+      records.forEach((record) => {
+        const ref = doc(db, `users/${user.uid}/logs`, record.id);
+        batch.delete(ref);
+      });
+      await batch.commit();
+      setRecords([]);
+      showToast("All history cleared", "success");
+    } catch (error) {
+      console.error("Error clearing history:", error);
+      showToast("Failed to clear history", "error");
+    } finally {
+      setIsDeleting(false);
+      setShowClearAllConfirm(false);
+    }
+  };
+
   return (
     <div className="space-y-6">
       <header className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8">
@@ -279,6 +323,14 @@ export function History() {
                       <Printer className="w-4 h-4 text-zinc-500" />
                       Print
                     </button>
+                    <div className="h-px bg-zinc-200 dark:bg-zinc-800 my-1" />
+                    <button
+                      onClick={() => setShowClearAllConfirm(true)}
+                      className="w-full flex items-center gap-3 px-3 py-2 text-sm text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-xl transition-colors text-left"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                      Clear All History
+                    </button>
                   </div>
                 </motion.div>
               )}
@@ -286,6 +338,83 @@ export function History() {
           </div>
         </div>
       </header>
+
+      {/* Confirmation Modals */}
+      <AnimatePresence>
+        {recordToDelete && (
+          <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
+            <motion.div
+              initial={{ scale: 0.9, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.9, opacity: 0 }}
+              className="bg-white dark:bg-zinc-900 rounded-3xl p-6 max-w-sm w-full shadow-2xl border border-zinc-200 dark:border-zinc-800"
+            >
+              <div className="w-12 h-12 rounded-2xl bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400 flex items-center justify-center mb-4">
+                <AlertTriangle className="w-6 h-6" />
+              </div>
+              <h3 className="text-xl font-bold mb-2">Delete Record?</h3>
+              <p className="text-zinc-500 dark:text-zinc-400 mb-6">
+                This action cannot be undone. This record will be permanently removed from your history.
+              </p>
+              <div className="flex gap-3">
+                <Button
+                  variant="secondary"
+                  className="flex-1"
+                  onClick={() => setRecordToDelete(null)}
+                  disabled={isDeleting}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  variant="primary"
+                  className="flex-1 bg-red-600 hover:bg-red-700 text-white border-none"
+                  onClick={() => handleDeleteRecord(recordToDelete)}
+                  disabled={isDeleting}
+                >
+                  {isDeleting ? "Deleting..." : "Delete"}
+                </Button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+
+        {showClearAllConfirm && (
+          <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
+            <motion.div
+              initial={{ scale: 0.9, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.9, opacity: 0 }}
+              className="bg-white dark:bg-zinc-900 rounded-3xl p-6 max-w-sm w-full shadow-2xl border border-zinc-200 dark:border-zinc-800"
+            >
+              <div className="w-12 h-12 rounded-2xl bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400 flex items-center justify-center mb-4">
+                <Trash2 className="w-6 h-6" />
+              </div>
+              <h3 className="text-xl font-bold mb-2">Clear All History?</h3>
+              <p className="text-zinc-500 dark:text-zinc-400 mb-6">
+                Are you sure you want to delete ALL your attendance records? This action is permanent and cannot be reversed.
+              </p>
+              <div className="flex gap-3">
+                <Button
+                  variant="secondary"
+                  className="flex-1"
+                  onClick={() => setShowClearAllConfirm(false)}
+                  disabled={isDeleting}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  variant="primary"
+                  className="flex-1 bg-red-600 hover:bg-red-700 text-white border-none"
+                  onClick={handleClearAllHistory}
+                  disabled={isDeleting}
+                >
+                  {isDeleting ? "Clearing..." : "Clear All"}
+                </Button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
 
       <AnimatePresence>
         {showFilters && (
@@ -414,6 +543,12 @@ export function History() {
                             {calculateHours(record.clockIn, record.clockOut)}
                           </p>
                         </div>
+                        <button
+                          onClick={() => setRecordToDelete(record.id)}
+                          className="p-2 text-zinc-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-xl transition-all opacity-0 group-hover:opacity-100"
+                        >
+                          <Trash2 className="w-5 h-5" />
+                        </button>
                       </div>
                     </div>
 

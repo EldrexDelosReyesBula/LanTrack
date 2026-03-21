@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { motion } from "motion/react";
+import { motion, AnimatePresence } from "motion/react";
 import {
   Settings as SettingsIcon,
   Moon,
@@ -14,13 +14,17 @@ import {
   ArrowLeft,
   X,
   Heart,
+  Trash2,
+  AlertTriangle,
+  RotateCcw,
 } from "lucide-react";
 import { useAuth } from "../contexts/AuthContext";
 import { useTheme } from "../contexts/ThemeContext";
 import { useNotification } from "../contexts/NotificationContext";
 import { useToast } from "../contexts/ToastContext";
 import { db, auth } from "../lib/firebase";
-import { doc, updateDoc } from "firebase/firestore";
+import { doc, updateDoc, deleteDoc, collection, getDocs, writeBatch } from "firebase/firestore";
+import { deleteUser } from "firebase/auth";
 import { Card } from "../components/ui/Card";
 import { Button } from "../components/ui/Button";
 import { BottomSheet } from "../components/ui/BottomSheet";
@@ -46,6 +50,8 @@ export function Settings() {
   >("menu");
   const [isPasswordSheetOpen, setIsPasswordSheetOpen] = useState(false);
   const [isEmailSheetOpen, setIsEmailSheetOpen] = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [showResetConfirm, setShowResetConfirm] = useState(false);
 
   const [currentPassword, setCurrentPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
@@ -57,6 +63,10 @@ export function Settings() {
   const [autoClockEnabled, setAutoClockEnabled] = useState(
     user?.autoClockEnabled || false,
   );
+  const [autoClockDays, setAutoClockDays] = useState<number[]>(
+    user?.autoClockDays || [1, 2, 3, 4, 5],
+  );
+  const [holidays, setHolidays] = useState<string[]>(user?.holidays || []);
 
   const [notifyApprovals, setNotifyApprovals] = useState(
     user?.notifyApprovals ?? true,
@@ -233,6 +243,8 @@ export function Settings() {
         autoClockIn,
         autoClockOut,
         autoClockEnabled,
+        autoClockDays,
+        holidays,
       });
       showToast("Automation settings updated", "success");
     } catch (error: any) {
@@ -282,6 +294,59 @@ export function Settings() {
       showToast(error.message || "Failed to update goals", "error");
     } finally {
       setIsUpdating(false);
+    }
+  };
+
+  const handleResetData = async () => {
+    if (!user || !db) return;
+    setIsUpdating(true);
+    try {
+      const batch = writeBatch(db);
+
+      // Clear logs
+      const logsSnap = await getDocs(collection(db, `users/${user.uid}/logs`));
+      logsSnap.forEach((doc) => batch.delete(doc.ref));
+
+      // Clear tasks
+      const tasksSnap = await getDocs(collection(db, `users/${user.uid}/tasks`));
+      tasksSnap.forEach((doc) => batch.delete(doc.ref));
+
+      // Clear events
+      const eventsSnap = await getDocs(collection(db, `users/${user.uid}/events`));
+      eventsSnap.forEach((doc) => batch.delete(doc.ref));
+
+      await batch.commit();
+      showToast("All data has been reset", "success");
+    } catch (error) {
+      console.error("Error resetting data:", error);
+      showToast("Failed to reset data", "error");
+    } finally {
+      setIsUpdating(false);
+      setShowResetConfirm(false);
+    }
+  };
+
+  const handleDeleteAccount = async () => {
+    if (!user || !db || !auth.currentUser) return;
+    setIsUpdating(true);
+    try {
+      // 1. Delete Firestore data
+      await handleResetData();
+      await deleteDoc(doc(db, "users", user.uid));
+
+      // 2. Delete Auth user
+      await deleteUser(auth.currentUser);
+      showToast("Account deleted successfully", "success");
+    } catch (error: any) {
+      console.error("Error deleting account:", error);
+      if (error.code === "auth/requires-recent-login") {
+        showToast("Please re-authenticate to delete your account", "error");
+      } else {
+        showToast("Failed to delete account", "error");
+      }
+    } finally {
+      setIsUpdating(false);
+      setShowDeleteConfirm(false);
     }
   };
 
@@ -689,6 +754,19 @@ export function Settings() {
       (provider) => provider.providerId === "google.com",
     );
 
+    const [analyticsEnabled, setAnalyticsEnabled] = useState(
+      localStorage.getItem("analytics_accepted") === "true"
+    );
+
+    const handleToggleAnalytics = () => {
+      const newValue = !analyticsEnabled;
+      setAnalyticsEnabled(newValue);
+      localStorage.setItem("analytics_accepted", newValue ? "true" : "false");
+      showToast(`Analytics ${newValue ? "enabled" : "disabled"}`, "success");
+      // Reload to apply changes to Vercel Analytics component
+      window.location.reload();
+    };
+
     return (
       <div className="space-y-6">
         <Card>
@@ -736,6 +814,148 @@ export function Settings() {
             </div>
           )}
         </Card>
+
+        <Card>
+          <h2 className="text-lg font-bold mb-6 flex items-center gap-2">
+            <Shield className="w-5 h-5 text-indigo-500" />
+            Privacy
+          </h2>
+          <div className="space-y-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <h3 className="font-medium">Vercel Analytics</h3>
+                <p className="text-sm text-zinc-500">
+                  Help us improve by sending anonymous usage data.
+                </p>
+              </div>
+              <label className="relative inline-flex items-center cursor-pointer">
+                <input
+                  type="checkbox"
+                  className="sr-only peer"
+                  checked={analyticsEnabled}
+                  onChange={handleToggleAnalytics}
+                />
+                <div className="w-11 h-6 bg-zinc-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-indigo-300 dark:peer-focus:ring-indigo-800 rounded-full peer dark:bg-zinc-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-zinc-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-zinc-600 peer-checked:bg-indigo-600"></div>
+              </label>
+            </div>
+          </div>
+        </Card>
+
+        <Card className="border-red-200 dark:border-red-900/30 bg-red-50/30 dark:bg-red-900/10">
+          <h2 className="text-lg font-bold mb-4 flex items-center gap-2 text-red-600 dark:text-red-400">
+            <AlertTriangle className="w-5 h-5" />
+            Danger Zone
+          </h2>
+          <div className="space-y-4">
+            <div className="flex items-center justify-between p-4 bg-white dark:bg-zinc-900 rounded-2xl border border-red-100 dark:border-red-900/20">
+              <div>
+                <p className="font-semibold text-zinc-900 dark:text-zinc-100">Reset All Data</p>
+                <p className="text-xs text-zinc-500">Delete all logs, tasks, and calendar events.</p>
+              </div>
+              <Button
+                variant="secondary"
+                size="sm"
+                className="text-red-600 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-900/20"
+                onClick={() => setShowResetConfirm(true)}
+              >
+                <RotateCcw className="w-4 h-4 mr-2" />
+                Reset
+              </Button>
+            </div>
+            <div className="flex items-center justify-between p-4 bg-white dark:bg-zinc-900 rounded-2xl border border-red-100 dark:border-red-900/20">
+              <div>
+                <p className="font-semibold text-zinc-900 dark:text-zinc-100">Delete Account</p>
+                <p className="text-xs text-zinc-500">Permanently remove your account and all data.</p>
+              </div>
+              <Button
+                variant="primary"
+                size="sm"
+                className="bg-red-600 hover:bg-red-700 text-white border-none"
+                onClick={() => setShowDeleteConfirm(true)}
+              >
+                <Trash2 className="w-4 h-4 mr-2" />
+                Delete
+              </Button>
+            </div>
+          </div>
+        </Card>
+
+        {/* Confirmation Modals */}
+        <AnimatePresence>
+          {showResetConfirm && (
+            <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
+              <motion.div
+                initial={{ scale: 0.9, opacity: 0 }}
+                animate={{ scale: 1, opacity: 1 }}
+                exit={{ scale: 0.9, opacity: 0 }}
+                className="bg-white dark:bg-zinc-900 rounded-3xl p-6 max-w-sm w-full shadow-2xl border border-zinc-200 dark:border-zinc-800"
+              >
+                <div className="w-12 h-12 rounded-2xl bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400 flex items-center justify-center mb-4">
+                  <RotateCcw className="w-6 h-6" />
+                </div>
+                <h3 className="text-xl font-bold mb-2">Reset All Data?</h3>
+                <p className="text-zinc-500 dark:text-zinc-400 mb-6">
+                  This will permanently delete all your attendance logs, tasks, and calendar events. Your profile settings will be kept.
+                </p>
+                <div className="flex gap-3">
+                  <Button
+                    variant="secondary"
+                    className="flex-1"
+                    onClick={() => setShowResetConfirm(false)}
+                    disabled={isUpdating}
+                  >
+                    Cancel
+                  </Button>
+                  <Button
+                    variant="primary"
+                    className="flex-1 bg-red-600 hover:bg-red-700 text-white border-none"
+                    onClick={handleResetData}
+                    disabled={isUpdating}
+                  >
+                    {isUpdating ? "Resetting..." : "Reset Data"}
+                  </Button>
+                </div>
+              </motion.div>
+            </div>
+          )}
+
+          {showDeleteConfirm && (
+            <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
+              <motion.div
+                initial={{ scale: 0.9, opacity: 0 }}
+                animate={{ scale: 1, opacity: 1 }}
+                exit={{ scale: 0.9, opacity: 0 }}
+                className="bg-white dark:bg-zinc-900 rounded-3xl p-6 max-w-sm w-full shadow-2xl border border-zinc-200 dark:border-zinc-800"
+              >
+                <div className="w-12 h-12 rounded-2xl bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400 flex items-center justify-center mb-4">
+                  <Trash2 className="w-6 h-6" />
+                </div>
+                <h3 className="text-xl font-bold mb-2">Delete Account?</h3>
+                <p className="text-zinc-500 dark:text-zinc-400 mb-6">
+                  Are you sure you want to delete your account? This action is permanent and will remove all your data from LanTrack.
+                </p>
+                <div className="flex gap-3">
+                  <Button
+                    variant="secondary"
+                    className="flex-1"
+                    onClick={() => setShowDeleteConfirm(false)}
+                    disabled={isUpdating}
+                  >
+                    Cancel
+                  </Button>
+                  <Button
+                    variant="primary"
+                    className="flex-1 bg-red-600 hover:bg-red-700 text-white border-none"
+                    onClick={handleDeleteAccount}
+                    disabled={isUpdating}
+                  >
+                    {isUpdating ? "Deleting..." : "Delete Account"}
+                  </Button>
+                </div>
+              </motion.div>
+            </div>
+          )}
+        </AnimatePresence>
       </div>
     );
   };
@@ -772,6 +992,41 @@ export function Settings() {
             className={`space-y-4 transition-opacity ${!autoClockEnabled ? "opacity-50 pointer-events-none" : ""}`}
           >
             <div>
+              <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-2">
+                Active Days
+              </label>
+              <div className="flex flex-wrap gap-2">
+                {[
+                  { label: "Sun", value: 0 },
+                  { label: "Mon", value: 1 },
+                  { label: "Tue", value: 2 },
+                  { label: "Wed", value: 3 },
+                  { label: "Thu", value: 4 },
+                  { label: "Fri", value: 5 },
+                  { label: "Sat", value: 6 },
+                ].map((day) => (
+                  <button
+                    key={day.value}
+                    type="button"
+                    onClick={() => {
+                      if (autoClockDays.includes(day.value)) {
+                        setAutoClockDays(autoClockDays.filter((d) => d !== day.value));
+                      } else {
+                        setAutoClockDays([...autoClockDays, day.value].sort());
+                      }
+                    }}
+                    className={`px-3 py-1.5 rounded-full text-sm font-medium transition-colors ${
+                      autoClockDays.includes(day.value)
+                        ? "bg-indigo-100 text-indigo-700 dark:bg-indigo-900/50 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800"
+                        : "bg-zinc-100 text-zinc-600 dark:bg-zinc-800 dark:text-zinc-400 border border-transparent hover:bg-zinc-200 dark:hover:bg-zinc-700"
+                    }`}
+                  >
+                    {day.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <div>
               <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-1">
                 Auto Clock-In Time
               </label>
@@ -792,6 +1047,51 @@ export function Settings() {
                 onChange={(e) => setAutoClockOut(e.target.value)}
                 className="w-full px-4 py-2 rounded-xl bg-zinc-50 dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-zinc-100 focus:ring-2 focus:ring-indigo-500"
               />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-1">
+                Holidays (Auto-clock will skip these dates)
+              </label>
+              <div className="space-y-2">
+                <div className="flex gap-2">
+                  <input
+                    type="date"
+                    id="holiday-input"
+                    className="flex-1 px-4 py-2 rounded-xl bg-zinc-50 dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-zinc-100 focus:ring-2 focus:ring-indigo-500"
+                  />
+                  <Button
+                    type="button"
+                    onClick={() => {
+                      const input = document.getElementById("holiday-input") as HTMLInputElement;
+                      if (input.value && !holidays.includes(input.value)) {
+                        setHolidays([...holidays, input.value].sort());
+                        input.value = "";
+                      }
+                    }}
+                  >
+                    Add
+                  </Button>
+                </div>
+                {holidays.length > 0 && (
+                  <div className="flex flex-wrap gap-2 mt-2">
+                    {holidays.map((holiday) => (
+                      <span
+                        key={holiday}
+                        className="inline-flex items-center gap-1 px-3 py-1 rounded-full text-sm bg-zinc-100 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300"
+                      >
+                        {holiday}
+                        <button
+                          type="button"
+                          onClick={() => setHolidays(holidays.filter((h) => h !== holiday))}
+                          className="p-0.5 hover:bg-zinc-200 dark:hover:bg-zinc-700 rounded-full transition-colors"
+                        >
+                          <X className="w-3 h-3" />
+                        </button>
+                      </span>
+                    ))}
+                  </div>
+                )}
+              </div>
             </div>
           </div>
 

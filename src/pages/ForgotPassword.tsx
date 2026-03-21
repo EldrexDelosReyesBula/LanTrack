@@ -30,7 +30,7 @@ export function ForgotPassword() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-zinc-50 dark:bg-zinc-950 p-4 font-sans text-zinc-900 dark:text-zinc-100 relative overflow-hidden">
+    <div className="min-h-screen flex items-center justify-center bg-zinc-50 dark:bg-zinc-950 p-0 md:p-4 font-sans text-zinc-900 dark:text-zinc-100 relative overflow-hidden">
       {/* Animated Background Blobs */}
       <div className="absolute inset-0 z-0 overflow-hidden pointer-events-none">
         <div className="absolute -top-[10%] -left-[10%] w-[40%] h-[40%] bg-indigo-500/20 dark:bg-indigo-500/10 rounded-full blur-3xl mix-blend-multiply dark:mix-blend-screen animate-blob"></div>
@@ -41,9 +41,9 @@ export function ForgotPassword() {
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
-        className="w-full max-w-md relative z-10"
+        className="w-full h-full md:h-auto min-h-screen md:min-h-0 max-w-md relative z-10"
       >
-        <Card className="p-8 md:p-10 shadow-2xl shadow-indigo-500/5 border border-white/20 dark:border-white/5 backdrop-blur-xl bg-white/80 dark:bg-zinc-900/80">
+        <Card className="pixelated-mobile p-8 md:p-10 w-full h-full md:h-auto min-h-screen md:min-h-0 rounded-none md:rounded-2xl shadow-2xl shadow-indigo-500/5 border-0 md:border border-white/20 dark:border-white/5 backdrop-blur-xl bg-white/80 dark:bg-zinc-900/80 flex flex-col justify-center">
           <div className="text-center mb-8">
             <motion.div
               initial={{ scale: 0.5, rotate: -10 }}
@@ -53,10 +53,10 @@ export function ForgotPassword() {
             >
               <KeyRound className="w-8 h-8 -rotate-12" />
             </motion.div>
-            <h1 className="text-3xl font-bold tracking-tight mb-2">
+            <h1 className="text-3xl font-bold tracking-tight mb-2 md:font-sans md:text-3xl" style={{ fontSize: '1.5rem', lineHeight: '2rem' }}>
               Reset Password
             </h1>
-            <p className="text-zinc-500 dark:text-zinc-400">
+            <p className="text-zinc-500 dark:text-zinc-400 md:font-sans md:text-base" style={{ fontSize: '0.6rem', lineHeight: '1rem' }}>
               Enter your email to receive a reset link
             </p>
           </div>

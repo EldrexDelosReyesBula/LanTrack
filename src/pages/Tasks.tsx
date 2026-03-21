@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "motion/react";
-import { CheckCircle, Circle, Plus, Calendar, User as UserIcon, Clock, Edit2, MessageSquare, AlertTriangle, Filter } from "lucide-react";
-import { collection, query, where, getDocs, addDoc, updateDoc, doc, orderBy, getDoc } from "firebase/firestore";
+import { CheckCircle, Circle, Plus, Calendar, User as UserIcon, Clock, Edit2, MessageSquare, AlertTriangle, Filter, Trash2, X } from "lucide-react";
+import { collection, query, where, getDocs, addDoc, updateDoc, doc, orderBy, getDoc, deleteDoc, writeBatch } from "firebase/firestore";
 import { format } from "date-fns";
 import { useAuth } from "../contexts/AuthContext";
 import { useToast } from "../contexts/ToastContext";
@@ -9,6 +9,7 @@ import { createNotification } from "../utils/notifications";
 import { db } from "../lib/firebase";
 import { Card } from "../components/ui/Card";
 import { Button } from "../components/ui/Button";
+import { BottomSheet } from "../components/ui/BottomSheet";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 
@@ -34,8 +35,13 @@ export function Tasks() {
   const [editingTaskId, setEditingTaskId] = useState<string | null>(null);
   const [filterStatus, setFilterStatus] = useState<"all" | "todo" | "in_progress" | "completed">("all");
   
+  // Selection state
+  const [selectedTaskIds, setSelectedTaskIds] = useState<string[]>([]);
+  
   // Confirmation modal state
   const [taskToComplete, setTaskToComplete] = useState<string | null>(null);
+  const [taskToDelete, setTaskToDelete] = useState<string | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   const [newTask, setNewTask] = useState({
     title: "",
@@ -143,6 +149,60 @@ export function Tasks() {
     await confirmUpdateStatus(taskId, newStatus);
   };
 
+  const handleBulkComplete = async () => {
+    if (!user || !db || selectedTaskIds.length === 0) return;
+    try {
+      const batch = writeBatch(db);
+      selectedTaskIds.forEach(id => {
+        const taskRef = doc(db, `users/${user.uid}/tasks`, id);
+        batch.update(taskRef, { status: "completed" });
+      });
+      await batch.commit();
+      
+      setTasks(tasks.map(t => selectedTaskIds.includes(t.id) ? { ...t, status: "completed" } : t));
+      showToast(`${selectedTaskIds.length} tasks marked as completed`, "success");
+      setSelectedTaskIds([]);
+    } catch (error: any) {
+      console.error("Error bulk updating tasks:", error);
+      showToast(error.message || "Failed to update tasks", "error");
+    }
+  };
+
+  const handleBulkDelete = async () => {
+    if (!user || !db || selectedTaskIds.length === 0) return;
+    if (!window.confirm(`Are you sure you want to delete ${selectedTaskIds.length} tasks?`)) return;
+    
+    try {
+      const batch = writeBatch(db);
+      selectedTaskIds.forEach(id => {
+        const taskRef = doc(db, `users/${user.uid}/tasks`, id);
+        batch.delete(taskRef);
+      });
+      await batch.commit();
+      
+      setTasks(tasks.filter(t => !selectedTaskIds.includes(t.id)));
+      showToast(`${selectedTaskIds.length} tasks deleted successfully`, "success");
+      setSelectedTaskIds([]);
+    } catch (error: any) {
+      console.error("Error bulk deleting tasks:", error);
+      showToast(error.message || "Failed to delete tasks", "error");
+    }
+  };
+
+  const toggleTaskSelection = (taskId: string) => {
+    setSelectedTaskIds(prev => 
+      prev.includes(taskId) ? prev.filter(id => id !== taskId) : [...prev, taskId]
+    );
+  };
+
+  const toggleSelectAll = () => {
+    if (selectedTaskIds.length === filteredTasks.length) {
+      setSelectedTaskIds([]);
+    } else {
+      setSelectedTaskIds(filteredTasks.map(t => t.id));
+    }
+  };
+
   const confirmUpdateStatus = async (taskId: string, newStatus: string) => {
     if (!user || !db) return;
     try {
@@ -169,13 +229,30 @@ export function Tasks() {
     }
   };
 
+  const handleDeleteTask = async (taskId: string) => {
+    if (!user || !db) return;
+    try {
+      setIsDeleting(true);
+      const taskRef = doc(db, `users/${user.uid}/tasks`, taskId);
+      await deleteDoc(taskRef);
+      setTasks(tasks.filter(t => t.id !== taskId));
+      showToast("Task deleted successfully", "success");
+      setTaskToDelete(null);
+    } catch (error: any) {
+      console.error("Error deleting task:", error);
+      showToast(error.message || "Failed to delete task", "error");
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+
   const filteredTasks = tasks.filter(task => {
     if (filterStatus === "all") return true;
     return task.status === filterStatus;
   });
 
   return (
-    <div className="max-w-4xl mx-auto space-y-6">
+    <div className="max-w-4xl mx-auto space-y-6 pb-24">
       <header className="mb-8 flex flex-col md:flex-row md:justify-between md:items-end gap-4">
         <div>
           <h1 className="text-4xl font-bold tracking-tight mb-3 bg-clip-text text-transparent bg-gradient-to-r from-zinc-900 to-zinc-500 dark:from-white dark:to-zinc-400">
@@ -186,6 +263,14 @@ export function Tasks() {
           </p>
         </div>
         <div className="flex items-center gap-3">
+          {filteredTasks.length > 0 && (
+            <button
+              onClick={toggleSelectAll}
+              className="flex items-center gap-2 px-3 py-1.5 text-sm font-medium text-zinc-600 dark:text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-xl transition-colors"
+            >
+              {selectedTaskIds.length === filteredTasks.length ? "Deselect All" : "Select All"}
+            </button>
+          )}
           <div className="flex items-center gap-2 bg-white dark:bg-zinc-900 px-3 py-1.5 rounded-xl border border-zinc-200 dark:border-zinc-800">
             <Filter className="w-4 h-4 text-zinc-500" />
             <select
@@ -210,72 +295,140 @@ export function Tasks() {
         </div>
       </header>
 
-      <AnimatePresence>
-        {showNewTask && (
-          <motion.div
-            initial={{ opacity: 0, height: 0 }}
-            animate={{ opacity: 1, height: "auto" }}
-            exit={{ opacity: 0, height: 0 }}
-            className="overflow-hidden"
-          >
-            <Card className="mb-8 border-indigo-500/20 bg-indigo-50/30 dark:bg-indigo-900/10">
-              <h3 className="text-xl font-bold mb-4">{editingTaskId ? "Edit Task" : "Assign New Task"}</h3>
-              <form onSubmit={handleCreateTask} className="space-y-4">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-sm font-medium mb-1.5">Title</label>
-                    <input
-                      required
-                      type="text"
-                      value={newTask.title}
-                      onChange={e => setNewTask({...newTask, title: e.target.value})}
-                      className="w-full px-4 py-2.5 rounded-xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 focus:ring-2 focus:ring-indigo-500"
-                    />
+      {/* Desktop Task Form */}
+      <div className="hidden md:block">
+        <AnimatePresence>
+          {showNewTask && (
+            <motion.div
+              initial={{ opacity: 0, height: 0 }}
+              animate={{ opacity: 1, height: "auto" }}
+              exit={{ opacity: 0, height: 0 }}
+              className="overflow-hidden"
+            >
+              <Card className="mb-8 border-indigo-500/20 bg-indigo-50/30 dark:bg-indigo-900/10">
+                <h3 className="text-xl font-bold mb-4">{editingTaskId ? "Edit Task" : "Assign New Task"}</h3>
+                <form onSubmit={handleCreateTask} className="space-y-4">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-medium mb-1.5">Title</label>
+                      <input
+                        required
+                        type="text"
+                        value={newTask.title}
+                        onChange={e => setNewTask({...newTask, title: e.target.value})}
+                        className="w-full px-4 py-2.5 rounded-xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 focus:ring-2 focus:ring-indigo-500"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium mb-1.5">Priority</label>
+                      <select
+                        value={newTask.priority}
+                        onChange={e => setNewTask({...newTask, priority: e.target.value as any})}
+                        className="w-full px-4 py-2.5 rounded-xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 focus:ring-2 focus:ring-indigo-500"
+                      >
+                        <option value="low">Low</option>
+                        <option value="medium">Medium</option>
+                        <option value="high">High</option>
+                      </select>
+                    </div>
+                    <div className="md:col-span-2">
+                      <label className="block text-sm font-medium mb-1.5">Description (Optional, Markdown Supported)</label>
+                      <textarea
+                        value={newTask.description}
+                        onChange={e => setNewTask({...newTask, description: e.target.value})}
+                        placeholder="Use markdown for rich text (e.g., **bold**, *italic*, - list)"
+                        className="w-full px-4 py-2.5 rounded-xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 focus:ring-2 focus:ring-indigo-500 resize-none h-32 font-mono text-sm"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium mb-1.5">Due Date & Time</label>
+                      <input
+                        required
+                        type="datetime-local"
+                        value={newTask.dueDate}
+                        onChange={e => setNewTask({...newTask, dueDate: e.target.value})}
+                        className="w-full px-4 py-2.5 rounded-xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 focus:ring-2 focus:ring-indigo-500"
+                      />
+                    </div>
                   </div>
-                  <div>
-                    <label className="block text-sm font-medium mb-1.5">Priority</label>
-                    <select
-                      value={newTask.priority}
-                      onChange={e => setNewTask({...newTask, priority: e.target.value as any})}
-                      className="w-full px-4 py-2.5 rounded-xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 focus:ring-2 focus:ring-indigo-500"
-                    >
-                      <option value="low">Low</option>
-                      <option value="medium">Medium</option>
-                      <option value="high">High</option>
-                    </select>
+                  <div className="flex justify-end gap-3 mt-6">
+                    <Button type="button" variant="ghost" onClick={() => {
+                      setShowNewTask(false);
+                      setEditingTaskId(null);
+                    }}>Cancel</Button>
+                    <Button type="submit">{editingTaskId ? "Save Changes" : "Create Task"}</Button>
                   </div>
-                  <div className="md:col-span-2">
-                    <label className="block text-sm font-medium mb-1.5">Description (Markdown Supported)</label>
-                    <textarea
-                      value={newTask.description}
-                      onChange={e => setNewTask({...newTask, description: e.target.value})}
-                      placeholder="Use markdown for rich text (e.g., **bold**, *italic*, - list)"
-                      className="w-full px-4 py-2.5 rounded-xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 focus:ring-2 focus:ring-indigo-500 resize-none h-32 font-mono text-sm"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium mb-1.5">Due Date & Time</label>
-                    <input
-                      required
-                      type="datetime-local"
-                      value={newTask.dueDate}
-                      onChange={e => setNewTask({...newTask, dueDate: e.target.value})}
-                      className="w-full px-4 py-2.5 rounded-xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 focus:ring-2 focus:ring-indigo-500"
-                    />
-                  </div>
-                </div>
-                <div className="flex justify-end gap-3 mt-6">
-                  <Button type="button" variant="ghost" onClick={() => {
-                    setShowNewTask(false);
-                    setEditingTaskId(null);
-                  }}>Cancel</Button>
-                  <Button type="submit">{editingTaskId ? "Save Changes" : "Create Task"}</Button>
-                </div>
-              </form>
-            </Card>
-          </motion.div>
-        )}
-      </AnimatePresence>
+                </form>
+              </Card>
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </div>
+
+      {/* Mobile Task Form (BottomSheet) */}
+      <div className="md:hidden">
+        <BottomSheet
+          isOpen={showNewTask}
+          onClose={() => {
+            setShowNewTask(false);
+            setEditingTaskId(null);
+          }}
+          title={editingTaskId ? "Edit Task" : "Assign New Task"}
+        >
+          <form onSubmit={handleCreateTask} className="space-y-4">
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium mb-1.5">Title</label>
+                <input
+                  required
+                  type="text"
+                  value={newTask.title}
+                  onChange={e => setNewTask({...newTask, title: e.target.value})}
+                  className="w-full px-4 py-2.5 rounded-xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 focus:ring-2 focus:ring-indigo-500"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium mb-1.5">Priority</label>
+                <select
+                  value={newTask.priority}
+                  onChange={e => setNewTask({...newTask, priority: e.target.value as any})}
+                  className="w-full px-4 py-2.5 rounded-xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 focus:ring-2 focus:ring-indigo-500"
+                >
+                  <option value="low">Low</option>
+                  <option value="medium">Medium</option>
+                  <option value="high">High</option>
+                </select>
+              </div>
+              <div>
+                <label className="block text-sm font-medium mb-1.5">Description (Optional, Markdown Supported)</label>
+                <textarea
+                  value={newTask.description}
+                  onChange={e => setNewTask({...newTask, description: e.target.value})}
+                  placeholder="Use markdown for rich text (e.g., **bold**, *italic*, - list)"
+                  className="w-full px-4 py-2.5 rounded-xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 focus:ring-2 focus:ring-indigo-500 resize-none h-32 font-mono text-sm"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium mb-1.5">Due Date & Time</label>
+                <input
+                  required
+                  type="datetime-local"
+                  value={newTask.dueDate}
+                  onChange={e => setNewTask({...newTask, dueDate: e.target.value})}
+                  className="w-full px-4 py-2.5 rounded-xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 focus:ring-2 focus:ring-indigo-500"
+                />
+              </div>
+            </div>
+            <div className="flex gap-3 pt-4 border-t border-zinc-100 dark:border-zinc-800">
+              <Button type="button" variant="outline" className="flex-1" onClick={() => {
+                setShowNewTask(false);
+                setEditingTaskId(null);
+              }}>Cancel</Button>
+              <Button type="submit" className="flex-1">{editingTaskId ? "Save" : "Create"}</Button>
+            </div>
+          </form>
+        </BottomSheet>
+      </div>
 
       <div className="space-y-4">
         {loading ? (
@@ -285,8 +438,20 @@ export function Tasks() {
         ) : filteredTasks.length > 0 ? (
           filteredTasks.map(task => (
             <motion.div key={task.id} layout initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}>
-              <Card className={`p-5 transition-all ${task.status === 'completed' ? 'opacity-60 bg-zinc-50 dark:bg-zinc-900/50' : ''}`}>
-                <div className="flex flex-col md:flex-row md:items-start gap-4">
+              <Card className={`p-5 transition-all flex gap-4 ${task.status === 'completed' ? 'opacity-60 bg-zinc-50 dark:bg-zinc-900/50' : ''}`}>
+                <div className="pt-1">
+                  <button
+                    onClick={() => toggleTaskSelection(task.id)}
+                    className={`w-6 h-6 rounded-lg border-2 flex items-center justify-center transition-all ${
+                      selectedTaskIds.includes(task.id)
+                        ? "bg-indigo-600 border-indigo-600 text-white"
+                        : "border-zinc-200 dark:border-zinc-800 hover:border-indigo-500"
+                    }`}
+                  >
+                    {selectedTaskIds.includes(task.id) && <CheckCircle className="w-4 h-4" />}
+                  </button>
+                </div>
+                <div className="flex-1 flex flex-col md:flex-row md:items-start gap-4">
                   <select
                     value={task.status}
                     onChange={(e) => updateTaskStatus(task.id, e.target.value)}
@@ -312,6 +477,13 @@ export function Tasks() {
                           title="Edit Task"
                         >
                           <Edit2 className="w-4 h-4" />
+                        </button>
+                        <button
+                          onClick={() => setTaskToDelete(task.id)}
+                          className="p-1.5 text-zinc-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-500/10 rounded-lg transition-colors"
+                          title="Delete Task"
+                        >
+                          <Trash2 className="w-4 h-4" />
                         </button>
                       </div>
                     </div>
@@ -349,6 +521,54 @@ export function Tasks() {
         )}
       </div>
 
+      {/* Bulk Action Bar */}
+      <AnimatePresence>
+        {selectedTaskIds.length > 0 && (
+          <motion.div
+            initial={{ y: 100, opacity: 0 }}
+            animate={{ y: 0, opacity: 1 }}
+            exit={{ y: 100, opacity: 0 }}
+            className="fixed bottom-24 left-1/2 -translate-x-1/2 z-40 w-full max-w-lg px-4"
+          >
+            <div className="bg-zinc-900 dark:bg-zinc-800 text-white p-4 rounded-2xl shadow-2xl flex items-center justify-between gap-4">
+              <div className="flex items-center gap-3">
+                <span className="bg-indigo-600 px-2 py-1 rounded-lg text-xs font-bold">
+                  {selectedTaskIds.length}
+                </span>
+                <span className="text-sm font-medium">Tasks Selected</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  onClick={handleBulkComplete}
+                  className="text-white hover:bg-white/10 gap-2"
+                >
+                  <CheckCircle className="w-4 h-4" />
+                  Complete
+                </Button>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  onClick={handleBulkDelete}
+                  className="text-red-400 hover:bg-red-400/10 gap-2"
+                >
+                  <Trash2 className="w-4 h-4" />
+                  Delete
+                </Button>
+                <div className="w-px h-6 bg-white/10 mx-1" />
+                <button
+                  onClick={() => setSelectedTaskIds([])}
+                  className="p-2 hover:bg-white/10 rounded-xl transition-colors"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       {/* Completion Confirmation Modal */}
       <AnimatePresence>
         {taskToComplete && (
@@ -379,6 +599,46 @@ export function Tasks() {
                 </Button>
                 <Button onClick={() => confirmUpdateStatus(taskToComplete, "completed")} className="bg-emerald-600 hover:bg-emerald-700 text-white">
                   Confirm
+                </Button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+      {/* Deletion Confirmation Modal */}
+      <AnimatePresence>
+        {taskToDelete && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm"
+          >
+            <motion.div
+              initial={{ scale: 0.95, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.95, opacity: 0 }}
+              className="bg-white dark:bg-zinc-900 rounded-2xl p-6 max-w-sm w-full shadow-2xl border border-zinc-200 dark:border-zinc-800"
+            >
+              <div className="flex items-center gap-4 mb-4">
+                <div className="w-10 h-10 rounded-full bg-red-100 dark:bg-red-900/30 flex items-center justify-center text-red-600 dark:text-red-400">
+                  <AlertTriangle className="w-5 h-5" />
+                </div>
+                <h3 className="text-lg font-bold">Delete Task?</h3>
+              </div>
+              <p className="text-zinc-600 dark:text-zinc-400 mb-6">
+                Are you sure you want to delete this task? This action cannot be undone.
+              </p>
+              <div className="flex justify-end gap-3">
+                <Button variant="ghost" onClick={() => setTaskToDelete(null)} disabled={isDeleting}>
+                  Cancel
+                </Button>
+                <Button 
+                  onClick={() => handleDeleteTask(taskToDelete)} 
+                  loading={isDeleting}
+                  className="bg-red-600 hover:bg-red-700 text-white"
+                >
+                  Delete
                 </Button>
               </div>
             </motion.div>

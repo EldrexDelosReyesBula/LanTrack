@@ -1,60 +1,41 @@
 import React, { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { motion } from "motion/react";
-import { Clock, Mail, Lock, ArrowRight, Chrome, AlertCircle } from "lucide-react";
+import { Clock, Mail, Lock, User, ArrowRight, Github, Chrome } from "lucide-react";
+import { Button } from "../components/ui/Button";
 import { useAuth } from "../contexts/AuthContext";
 import { useToast } from "../contexts/ToastContext";
-import { Button } from "../components/ui/Button";
-import { Card } from "../components/ui/Card";
 
-export function Login() {
-  const { user, signInWithGoogle, signInWithEmail, isConfigured } = useAuth();
+export function Signup() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [displayName, setDisplayName] = useState("");
   const [loading, setLoading] = useState(false);
+  const { signUpWithEmail, signInWithGoogle } = useAuth();
   const { showToast } = useToast();
   const navigate = useNavigate();
-
-  if (!isConfigured) {
-    return (
-      <div className="min-h-screen flex items-center justify-center p-6 bg-zinc-50 dark:bg-zinc-950">
-        <Card className="max-w-md w-full p-8 text-center rounded-3xl border-0 shadow-2xl">
-          <div className="w-16 h-16 bg-amber-100 dark:bg-amber-900/30 text-amber-600 rounded-2xl flex items-center justify-center mx-auto mb-6">
-            <AlertCircle className="w-8 h-8" />
-          </div>
-          <h1 className="text-2xl font-bold mb-4">Firebase Not Configured</h1>
-          <p className="text-zinc-500 dark:text-zinc-400 mb-8">
-            Please complete the Firebase setup using the AI Studio tool to enable authentication and database features.
-          </p>
-          <Button onClick={() => window.location.reload()} className="w-full h-14 rounded-2xl">
-            Check Again
-          </Button>
-        </Card>
-      </div>
-    );
-  }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
     try {
-      await signInWithEmail(email, password);
-      showToast("Welcome back!", "success");
-      navigate("/");
+      await signUpWithEmail(email, password, displayName);
+      showToast("Account created successfully!", "success");
+      navigate("/onboarding");
     } catch (error: any) {
-      showToast(error.message || "Login failed", "error");
+      showToast(error.message || "Failed to create account", "error");
     } finally {
       setLoading(false);
     }
   };
 
-  const handleGoogleLogin = async () => {
+  const handleGoogleSignup = async () => {
     try {
       await signInWithGoogle();
-      showToast("Signed in with Google!", "success");
-      navigate("/");
+      showToast("Signed up with Google!", "success");
+      navigate("/onboarding");
     } catch (error: any) {
-      showToast(error.message || "Google login failed", "error");
+      showToast(error.message || "Google signup failed", "error");
     }
   };
 
@@ -73,11 +54,26 @@ export function Login() {
               />
               <span className="text-2xl font-bold tracking-tight">LanTrack</span>
             </Link>
-            <h1 className="text-4xl font-black tracking-tighter mb-2">WELCOME BACK</h1>
-            <p className="text-zinc-500 dark:text-zinc-400 font-medium">Please enter your details to sign in.</p>
+            <h1 className="text-4xl font-black tracking-tighter mb-2">CREATE ACCOUNT</h1>
+            <p className="text-zinc-500 dark:text-zinc-400 font-medium">Start tracking your journey today.</p>
           </div>
 
           <form onSubmit={handleSubmit} className="space-y-6">
+            <div className="space-y-2">
+              <label className="text-sm font-bold uppercase tracking-wider text-zinc-400">Full Name</label>
+              <div className="relative group">
+                <User className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-zinc-400 group-focus-within:text-indigo-600 transition-colors" />
+                <input
+                  type="text"
+                  required
+                  value={displayName}
+                  onChange={(e) => setDisplayName(e.target.value)}
+                  className="w-full h-14 pl-12 pr-4 bg-zinc-50 dark:bg-zinc-900 border-2 border-transparent focus:border-indigo-600 rounded-2xl outline-none transition-all font-medium"
+                  placeholder="John Doe"
+                />
+              </div>
+            </div>
+
             <div className="space-y-2">
               <label className="text-sm font-bold uppercase tracking-wider text-zinc-400">Email Address</label>
               <div className="relative group">
@@ -94,12 +90,7 @@ export function Login() {
             </div>
 
             <div className="space-y-2">
-              <div className="flex items-center justify-between">
-                <label className="text-sm font-bold uppercase tracking-wider text-zinc-400">Password</label>
-                <Link to="/forgot-password" title="Forgot Password" className="text-xs font-bold text-indigo-600 hover:underline">
-                  Forgot?
-                </Link>
-              </div>
+              <label className="text-sm font-bold uppercase tracking-wider text-zinc-400">Password</label>
               <div className="relative group">
                 <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-zinc-400 group-focus-within:text-indigo-600 transition-colors" />
                 <input
@@ -118,7 +109,7 @@ export function Login() {
               loading={loading}
               className="w-full h-14 rounded-2xl text-lg font-bold shadow-xl shadow-indigo-500/20 gap-2"
             >
-              Sign In <ArrowRight className="w-5 h-5" />
+              Sign Up <ArrowRight className="w-5 h-5" />
             </Button>
           </form>
 
@@ -134,7 +125,7 @@ export function Login() {
           <div className="mt-8 grid grid-cols-1 gap-4">
             <Button 
               variant="outline" 
-              onClick={handleGoogleLogin}
+              onClick={handleGoogleSignup}
               className="h-14 rounded-2xl border-2 hover:bg-zinc-50 dark:hover:bg-zinc-900 gap-3 font-bold"
             >
               <Chrome className="w-5 h-5" />
@@ -143,9 +134,9 @@ export function Login() {
           </div>
 
           <p className="mt-12 text-center text-zinc-500 font-medium">
-            Don't have an account?{" "}
-            <Link to="/signup" className="text-indigo-600 hover:underline font-bold">
-              Sign Up
+            Already have an account?{" "}
+            <Link to="/login" className="text-indigo-600 hover:underline font-bold">
+              Sign In
             </Link>
           </p>
         </div>
@@ -166,7 +157,7 @@ export function Login() {
         </div>
 
         <div className="relative z-10 max-w-lg text-center">
-          <div className="w-32 h-32 bg-white dark:bg-zinc-800 rounded-3xl flex items-center justify-center mx-auto mb-12 shadow-2xl shadow-indigo-500/40 -rotate-12 p-4">
+          <div className="w-32 h-32 bg-white dark:bg-zinc-800 rounded-3xl flex items-center justify-center mx-auto mb-12 shadow-2xl shadow-indigo-500/40 rotate-12 p-4">
             <img 
               src="https://epublication.neocities.org/lantrack_logo.svg" 
               alt="LanTrack Logo" 
@@ -175,11 +166,22 @@ export function Login() {
             />
           </div>
           <h2 className="text-5xl font-black tracking-tighter mb-6 leading-tight">
-            TRACK YOUR TIME WITH PRECISION.
+            THE MODERN WAY TO TRACK YOUR TIME.
           </h2>
           <p className="text-xl text-zinc-500 dark:text-zinc-400 font-medium leading-relaxed">
-            The ultimate DTR ledger for modern students. Manage your hours, tasks, and schedules in one beautiful place.
+            Join thousands of students and interns who use LanTrack to manage their daily time records and stay productive.
           </p>
+          
+          <div className="mt-16 grid grid-cols-2 gap-4">
+            <div className="p-6 bg-white dark:bg-zinc-800 rounded-3xl shadow-sm">
+              <div className="text-3xl font-black text-indigo-600 mb-1">99%</div>
+              <div className="text-sm font-bold text-zinc-400 uppercase tracking-wider">Accuracy</div>
+            </div>
+            <div className="p-6 bg-white dark:bg-zinc-800 rounded-3xl shadow-sm">
+              <div className="text-3xl font-black text-indigo-600 mb-1">24/7</div>
+              <div className="text-sm font-bold text-zinc-400 uppercase tracking-wider">Offline Sync</div>
+            </div>
+          </div>
         </div>
       </div>
     </div>

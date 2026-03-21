@@ -273,6 +273,64 @@ export function Dashboard() {
         </motion.p>
       </header>
 
+      {/* Duolingo-style Streak Visualization */}
+      <motion.div 
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        className="bg-white dark:bg-zinc-900 rounded-2xl p-6 shadow-sm border border-zinc-200 dark:border-zinc-800 mb-8 flex flex-col md:flex-row items-center gap-6"
+      >
+        <div className="relative">
+          <div className="w-24 h-24 rounded-full bg-orange-100 dark:bg-orange-900/30 flex items-center justify-center relative z-10">
+            <Flame className={`w-12 h-12 ${stats.streak > 0 ? 'text-orange-500' : 'text-zinc-400'} ${stats.streak > 0 ? 'animate-pulse' : ''}`} />
+          </div>
+          {stats.streak > 0 && (
+            <motion.div 
+              animate={{ scale: [1, 1.2, 1], opacity: [0.5, 0.8, 0.5] }}
+              transition={{ duration: 2, repeat: Infinity }}
+              className="absolute inset-0 bg-orange-500/20 rounded-full blur-xl z-0"
+            />
+          )}
+        </div>
+        
+        <div className="flex-1 text-center md:text-left w-full">
+          <div className="flex flex-col md:flex-row md:items-end justify-between mb-2 gap-2">
+            <div>
+              <h2 className="text-2xl font-bold text-zinc-900 dark:text-zinc-100 flex items-center justify-center md:justify-start gap-2">
+                {stats.streak} Day Streak
+                {stats.streak > 0 && <span className="text-xl">🔥</span>}
+              </h2>
+              <p className="text-zinc-500 dark:text-zinc-400 font-medium">
+                {stats.streak === 0 
+                  ? "Start your streak today by clocking in!" 
+                  : stats.streak < 3 
+                    ? "Great start! Keep it up!" 
+                    : stats.streak < 7 
+                      ? "You're on fire! Don't stop now!" 
+                      : "Unstoppable! You're a productivity machine!"}
+              </p>
+            </div>
+            <div className="text-sm font-bold text-orange-500 bg-orange-50 dark:bg-orange-900/20 px-3 py-1 rounded-full inline-block self-center md:self-end">
+              Goal: 7 Days
+            </div>
+          </div>
+          
+          <div className="h-4 bg-zinc-100 dark:bg-zinc-800 rounded-full overflow-hidden mt-4">
+            <motion.div 
+              initial={{ width: 0 }}
+              animate={{ width: `${Math.min((stats.streak / 7) * 100, 100)}%` }}
+              transition={{ duration: 1, ease: "easeOut" }}
+              className="h-full bg-gradient-to-r from-orange-400 to-orange-500 rounded-full relative"
+            >
+              <div className="absolute top-0 left-0 right-0 h-1/3 bg-white/30 rounded-full" />
+            </motion.div>
+          </div>
+          <div className="flex justify-between mt-2 text-xs font-bold text-zinc-400">
+            <span>0</span>
+            <span>7 Days</span>
+          </div>
+        </div>
+      </motion.div>
+
       {/* Gamified Insight Banner */}
       {!loading && stats.lastActive && differenceInDays(startOfDay(new Date()), startOfDay(stats.lastActive)) > 2 && (
         <motion.div

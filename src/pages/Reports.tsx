@@ -8,11 +8,14 @@ import { collection, query, where, getDocs, orderBy } from "firebase/firestore";
 import { format, subDays, startOfDay, endOfDay, parseISO } from "date-fns";
 import { useAuth } from "../contexts/AuthContext";
 import { db } from "../lib/firebase";
+import jsPDF from "jspdf";
+import autoTable from "jspdf-autotable";
 
 export function Reports() {
   const { user } = useAuth();
   const [dateRange, setDateRange] = useState("this-week");
   const [chartData, setChartData] = useState<any[]>([]);
+  const [rawRecords, setRawRecords] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [stats, setStats] = useState({
     totalHours: 0,
@@ -35,6 +38,7 @@ export function Reports() {
 
         const snap = await getDocs(q);
         const records = snap.docs.map(doc => doc.data());
+        setRawRecords(records);
 
         // Process data for charts (last 7 days)
         const last7Days = Array.from({ length: 7 }).map((_, i) => {
@@ -98,6 +102,58 @@ export function Reports() {
     fetchReportData();
   }, [user, dateRange]);
 
+  const handleExportPDF = () => {
+    const doc = new jsPDF();
+    
+    // Header
+    doc.setFontSize(20);
+    doc.text("LanTrack Activity Report", 14, 22);
+    
+    doc.setFontSize(11);
+    doc.setTextColor(100);
+    doc.text(`Generated on: ${format(new Date(), 'PPpp')}`, 14, 30);
+    doc.text(`User: ${user?.displayName || user?.email || 'N/A'}`, 14, 36);
+    
+    // Summary Stats
+    doc.setFontSize(14);
+    doc.setTextColor(0);
+    doc.text("Summary Statistics", 14, 50);
+    
+    autoTable(doc, {
+      startY: 55,
+      head: [['Total Hours', 'Days Present', 'Late Logs', 'Resources Shared']],
+      body: [[
+        `${stats.totalHours}h`,
+        stats.daysPresent.toString(),
+        stats.lateLogs.toString(),
+        stats.resourcesShared.toString()
+      ]],
+      theme: 'grid',
+      headStyles: { fillColor: [79, 70, 229] }
+    });
+    
+    // Detailed Logs
+    doc.text("Detailed Logs", 14, (doc as any).lastAutoTable.finalY + 15);
+    
+    const tableData = rawRecords.slice(0, 50).map(r => [
+      r.date,
+      r.clockIn || '-',
+      r.clockOut || '-',
+      r.notes || '-',
+      r.tags?.join(', ') || '-'
+    ]);
+    
+    autoTable(doc, {
+      startY: (doc as any).lastAutoTable.finalY + 20,
+      head: [['Date', 'Clock In', 'Clock Out', 'Notes', 'Tags']],
+      body: tableData,
+      theme: 'striped',
+      headStyles: { fillColor: [79, 70, 229] }
+    });
+    
+    doc.save(`LanTrack_Report_${format(new Date(), 'yyyy-MM-dd')}.pdf`);
+  };
+
   return (
     <div className="space-y-6">
       <header className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8">
@@ -120,7 +176,7 @@ export function Reports() {
             <option value="last-month">Last Month</option>
             <option value="all-time">All Time</option>
           </select>
-          <Button variant="primary" size="sm">
+          <Button variant="primary" size="sm" onClick={handleExportPDF}>
             <Download className="w-4 h-4 mr-2" /> Export PDF
           </Button>
         </div>
