@@ -1,35 +1,43 @@
 import { initializeApp } from "firebase/app";
 import { getAuth, GoogleAuthProvider } from "firebase/auth";
-import { getFirestore, enableMultiTabIndexedDbPersistence } from "firebase/firestore";
+import { initializeFirestore, persistentLocalCache, persistentMultipleTabManager } from "firebase/firestore";
 import { getMessaging, isSupported } from "firebase/messaging";
 
-const firebaseConfig = {
-  apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
-  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
-  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID,
-  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET,
-  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID,
-  appId: import.meta.env.VITE_FIREBASE_APP_ID,
-};
+// Import the Firebase configuration
+import firebaseConfig from "../../firebase-applet-config.json";
 
 // Initialize Firebase only if config is provided
 const isConfigured = !!firebaseConfig.apiKey;
 
 export const app = isConfigured ? initializeApp(firebaseConfig) : null;
 export const auth = isConfigured ? getAuth(app!) : null;
-export const db = isConfigured ? getFirestore(app!) : null;
 
-if (db) {
-  enableMultiTabIndexedDbPersistence(db).catch((err) => {
-    if (err.code == 'failed-precondition') {
-      console.warn('Multiple tabs open, persistence can only be enabled in one tab at a a time.');
-    } else if (err.code == 'unimplemented') {
-      console.warn('The current browser does not support all of the features required to enable persistence');
-    }
-  });
-}
+// Use initializeFirestore with cache settings to avoid deprecation warning
+// Make sure to respect the named database if it's provided.
+export const db = isConfigured 
+  ? initializeFirestore(app!, {
+      localCache: persistentLocalCache({
+        tabManager: persistentMultipleTabManager()
+      })
+    }, firebaseConfig.firestoreDatabaseId) 
+  : null;
 
 export const googleProvider = isConfigured ? new GoogleAuthProvider() : null;
+
+// Test connection to Firestore
+if (db) {
+  const testConnection = async () => {
+    try {
+      const { doc, getDocFromServer } = await import("firebase/firestore");
+      await getDocFromServer(doc(db, 'test', 'connection'));
+    } catch (error) {
+      if (error instanceof Error && error.message.includes('the client is offline')) {
+        console.error("Please check your Firebase configuration. The client is offline.");
+      }
+    }
+  };
+  testConnection();
+}
 
 export const getMessagingInstance = async () => {
   if (!isConfigured) return null;
