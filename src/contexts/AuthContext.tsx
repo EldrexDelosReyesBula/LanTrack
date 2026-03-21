@@ -36,6 +36,8 @@ interface AppUser {
   autoClockIn?: string;
   autoClockOut?: string;
   autoClockEnabled?: boolean;
+  autoClockDays?: number[];
+  holidays?: string[];
   timeFormat?: "12h" | "24h";
   clockType?: "analog" | "digital";
   alarmEnabled?: boolean;
