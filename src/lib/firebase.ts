@@ -3,17 +3,27 @@ import { getAuth, GoogleAuthProvider } from "firebase/auth";
 import { initializeFirestore, persistentLocalCache, persistentMultipleTabManager } from "firebase/firestore";
 import { getMessaging, isSupported } from "firebase/messaging";
 
-// Import the Firebase configuration
-import firebaseConfig from "../../firebase-applet-config.json";
+// Safe loading of Firebase configuration
+// In AI Studio, this file is provisioned automatically.
+// In production (e.g., Vercel), we fall back to environment variables.
+const configs = import.meta.glob("../../firebase-applet-config.json", { eager: true });
+const configFromFile = (configs["../../firebase-applet-config.json"] as any)?.default;
 
-// Initialize Firebase only if config is provided
+const firebaseConfig = {
+  apiKey: configFromFile?.apiKey || import.meta.env.VITE_FIREBASE_API_KEY,
+  authDomain: configFromFile?.authDomain || import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
+  projectId: configFromFile?.projectId || import.meta.env.VITE_FIREBASE_PROJECT_ID,
+  storageBucket: configFromFile?.storageBucket || import.meta.env.VITE_FIREBASE_STORAGE_BUCKET,
+  messagingSenderId: configFromFile?.messagingSenderId || import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID,
+  appId: configFromFile?.appId || import.meta.env.VITE_FIREBASE_APP_ID,
+  firestoreDatabaseId: configFromFile?.firestoreDatabaseId || import.meta.env.VITE_FIREBASE_FIRESTORE_DATABASE_ID,
+};
+
 const isConfigured = !!firebaseConfig.apiKey;
 
 export const app = isConfigured ? initializeApp(firebaseConfig) : null;
 export const auth = isConfigured ? getAuth(app!) : null;
 
-// Use initializeFirestore with cache settings to avoid deprecation warning
-// Make sure to respect the named database if it's provided.
 export const db = isConfigured 
   ? initializeFirestore(app!, {
       localCache: persistentLocalCache({
@@ -24,7 +34,6 @@ export const db = isConfigured
 
 export const googleProvider = isConfigured ? new GoogleAuthProvider() : null;
 
-// Test connection to Firestore
 if (db) {
   const testConnection = async () => {
     try {
