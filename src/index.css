@@ -1,4 +1,4 @@
-@import url("https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap");
+@import url("https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Press+Start+2P&display=swap");
 @import "tailwindcss";
 
 @custom-variant dark (&:is(.dark *));
@@ -43,6 +43,21 @@ body {
   
   .glass-panel {
     @apply bg-white/60 dark:bg-zinc-900/60 backdrop-blur-md border border-white/10 dark:border-white/5;
+  }
+
+  .pixelated-mobile {
+    @apply rounded-none md:rounded-2xl;
+  }
+
+  @media (max-width: 767px) {
+    .pixelated-mobile {
+      font-family: 'Press Start 2P', cursive;
+      image-rendering: pixelated;
+    }
+    .pixelated-mobile input, .pixelated-mobile button {
+      font-family: 'Press Start 2P', cursive;
+      border-radius: 0;
+    }
   }
 }
 
