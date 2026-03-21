@@ -1,0 +1,163 @@
+{
+"entities": {
+"AppUser": {
+"title": "AppUser",
+"description": "Represents a user in the application.",
+"type": "object",
+"properties": {
+"uid": { "type": "string", "description": "The unique identifier for the user." },
+"email": { "type": "string", "format": "email", "description": "The user's email address." },
+"displayName": { "type": "string", "description": "The user's display name." },
+"photoURL": { "type": "string", "format": "uri", "description": "The user's profile photo URL." },
+"school": { "type": "string", "description": "The user's school or institution." },
+"partners": {
+"type": "array",
+"items": {
+"type": "object",
+"properties": {
+"id": { "type": "string" },
+"name": { "type": "string" },
+"allocatedHours": { "type": "number" }
+}
+}
+},
+"customTags": {
+"type": "array",
+"items": { "type": "string" }
+},
+"autoClockIn": { "type": "string", "description": "Time for auto clock in." },
+"autoClockOut": { "type": "string", "description": "Time for auto clock out." },
+"autoClockEnabled": { "type": "boolean", "description": "Whether auto clock is enabled." },
+"autoClockDays": {
+"type": "array",
+"items": { "type": "number" },
+"description": "Days of the week auto clock is enabled for (0=Sun, 1=Mon, etc.)."
+},
+"holidays": {
+"type": "array",
+"items": { "type": "string" }
+},
+"notifyApprovals": { "type": "boolean" },
+"notifyResources": { "type": "boolean" },
+"notifyReminders": { "type": "boolean" },
+"dailyGoalHours": { "type": "number" },
+"weeklyGoalHours": { "type": "number" },
+"timeFormat": { "type": "string", "enum": ["12h", "24h"] },
+"clockType": { "type": "string", "enum": ["analog", "digital"] },
+"alarmEnabled": { "type": "boolean" },
+"fcmTokens": {
+"type": "array",
+"items": { "type": "string" }
+},
+"onboardingCompleted": { "type": "boolean" },
+"createdAt": { "type": "string", "format": "date-time" },
+"lastLogin": { "type": "string", "format": "date-time" },
+"lastDisplayNameChange": { "type": "string", "format": "date-time" }
+},
+"required": ["uid", "email"]
+},
+"DTRRecord": {
+"title": "DTRRecord",
+"description": "A daily time record for a user.",
+"type": "object",
+"properties": {
+"userId": { "type": "string" },
+"date": { "type": "string", "format": "date" },
+"clockIn": { "type": "string", "format": "time" },
+"clockOut": { "type": "string", "format": "time" },
+"isAuto": { "type": "boolean", "description": "Whether the record was auto-generated." },
+"totalHours": { "type": "number" },
+"notes": { "type": "string" },
+"tags": {
+"type": "array",
+"items": { "type": "string" }
+},
+"partnerId": { "type": "string" },
+"sharedLinks": {
+"type": "array",
+"items": {
+"type": "object",
+"properties": {
+"id": { "type": "string" },
+"url": { "type": "string", "format": "uri" },
+"title": { "type": "string" },
+"visibility": { "type": "string", "enum": ["private", "shared"] }
+}
+}
+},
+"createdAt": { "type": "string", "format": "date-time" },
+"updatedAt": { "type": "string", "format": "date-time" }
+},
+"required": ["userId", "date", "clockIn"]
+},
+"Task": {
+"title": "Task",
+"description": "A task assigned to a user.",
+"type": "object",
+"properties": {
+"userId": { "type": "string" },
+"title": { "type": "string" },
+"description": { "type": "string" },
+"status": { "type": "string", "enum": ["todo", "in-progress", "completed"] },
+"priority": { "type": "string", "enum": ["low", "medium", "high"] },
+"dueDate": { "type": "string", "format": "date-time" },
+"createdAt": { "type": "string", "format": "date-time" },
+"updatedAt": { "type": "string", "format": "date-time" }
+},
+"required": ["userId", "title", "status"]
+},
+"Schedule": {
+"title": "Schedule",
+"description": "A schedule event for a user.",
+"type": "object",
+"properties": {
+"userId": { "type": "string" },
+"title": { "type": "string" },
+"description": { "type": "string" },
+"startDate": { "type": "string", "format": "date-time" },
+"endDate": { "type": "string", "format": "date-time" },
+"type": { "type": "string", "enum": ["admin", "personal"] },
+"createdAt": { "type": "string", "format": "date-time" },
+"updatedAt": { "type": "string", "format": "date-time" }
+},
+"required": ["userId", "title", "startDate", "endDate"]
+},
+"AppNotification": {
+"title": "AppNotification",
+"description": "A notification for a user.",
+"type": "object",
+"properties": {
+"userId": { "type": "string" },
+"title": { "type": "string" },
+"message": { "type": "string" },
+"type": { "type": "string", "enum": ["info", "success", "warning", "error"] },
+"read": { "type": "boolean" },
+"link": { "type": "string" },
+"createdAt": { "type": "string", "format": "date-time" }
+},
+"required": ["userId", "title", "message", "type", "read"]
+}
+},
+"firestore": {
+"/users/{userId}": {
+"schema": { "$ref": "#/entities/AppUser" },
+"description": "User profiles and settings."
+},
+"/users/{userId}/logs/{logId}": {
+"schema": { "$ref": "#/entities/DTRRecord" },
+"description": "Daily time records for a user."
+},
+"/users/{userId}/tasks/{taskId}": {
+"schema": { "$ref": "#/entities/Task" },
+"description": "Tasks for a user."
+},
+"/users/{userId}/schedules/{scheduleId}": {
+"schema": { "$ref": "#/entities/Schedule" },
+"description": "Schedules for a user."
+},
+"/users/{userId}/notifications/{notificationId}": {
+"schema": { "$ref": "#/entities/AppNotification" },
+"description": "Notifications for a user."
+}
+}
+}
