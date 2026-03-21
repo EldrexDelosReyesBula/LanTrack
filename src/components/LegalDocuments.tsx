@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { FullScreenModal } from './ui/FullScreenModal';
+import { FullScreenModal } from './ui/FullscreenModal';
 import { Button } from './ui/Button';
 import { Shield, FileText, Lock, Info } from 'lucide-react';
 import Markdown from 'react-markdown';
@@ -152,9 +152,10 @@ export function LegalDocuments() {
     <div className="space-y-4">
       <h3 className="text-lg font-semibold text-zinc-900 dark:text-zinc-100 mb-4">Legal & Privacy</h3>
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        {docs.map((doc) => (
+        {docs.map((doc, index) => (
           <button
             key={doc.id}
+            id={index === 0 ? "legal-docs-trigger" : undefined}
             onClick={() => setActiveDoc(doc.id)}
             className="flex items-center gap-3 p-4 rounded-2xl bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors text-left"
           >
