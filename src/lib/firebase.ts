@@ -3,11 +3,8 @@ import { getAuth, GoogleAuthProvider } from "firebase/auth";
 import { initializeFirestore, persistentLocalCache, persistentMultipleTabManager } from "firebase/firestore";
 import { getMessaging, isSupported } from "firebase/messaging";
 
-// Safe loading of Firebase configuration
-// In AI Studio, this file is provisioned automatically.
-// In production (e.g., Vercel), we fall back to environment variables.
-const configs = import.meta.glob("../../firebase-applet-config.json", { eager: true });
-const configFromFile = (configs["../../firebase-applet-config.json"] as any)?.default;
+const configs = import.meta.glob("/firebase-applet-config.json", { eager: true });
+const configFromFile = (configs["/firebase-applet-config.json"] as any)?.default;
 
 const firebaseConfig = {
   apiKey: configFromFile?.apiKey || import.meta.env.VITE_FIREBASE_API_KEY,
@@ -18,6 +15,11 @@ const firebaseConfig = {
   appId: configFromFile?.appId || import.meta.env.VITE_FIREBASE_APP_ID,
   firestoreDatabaseId: configFromFile?.firestoreDatabaseId || import.meta.env.VITE_FIREBASE_FIRESTORE_DATABASE_ID,
 };
+
+if (firebaseConfig.firestoreDatabaseId && firebaseConfig.firestoreDatabaseId.includes('://')) {
+  console.warn("Invalid Firestore Database ID detected (looks like a URL). Falling back to default.");
+  firebaseConfig.firestoreDatabaseId = undefined;
+}
 
 const isConfigured = !!firebaseConfig.apiKey;
 
