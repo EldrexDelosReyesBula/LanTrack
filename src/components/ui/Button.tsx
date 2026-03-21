@@ -2,13 +2,15 @@ import React from "react";
 import { motion, HTMLMotionProps } from "motion/react";
 import { cn } from "../../lib/utils";
 
-interface ButtonProps extends HTMLMotionProps<"button"> {
+interface ButtonProps extends Omit<HTMLMotionProps<"button">, "children"> {
   variant?: "primary" | "secondary" | "outline" | "ghost";
   size?: "sm" | "md" | "lg" | "icon";
+  loading?: boolean;
+  children?: React.ReactNode;
 }
 
 export const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
-  ({ className, variant = "primary", size = "md", ...props }, ref) => {
+  ({ className, variant = "primary", size = "md", loading = false, children, ...props }, ref) => {
     const baseStyles =
       "inline-flex items-center justify-center rounded-2xl font-semibold transition-all duration-300 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-indigo-500/30 disabled:opacity-50 disabled:pointer-events-none active:scale-[0.98]";
 
@@ -36,8 +38,14 @@ export const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
         whileHover={{ scale: 1.02 }}
         transition={{ type: "spring", stiffness: 400, damping: 25 }}
         className={cn(baseStyles, variants[variant], sizes[size], className)}
+        disabled={loading || props.disabled}
         {...props}
-      />
+      >
+        {loading ? (
+          <div className="w-5 h-5 border-2 border-current border-t-transparent rounded-full animate-spin mr-2" />
+        ) : null}
+        {children}
+      </motion.button>
     );
   },
 );
