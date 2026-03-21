@@ -17,6 +17,7 @@ import {
 import { useAuth } from "../../contexts/AuthContext";
 import { NotificationsDropdown } from "../NotificationsDropdown";
 import { Button } from "../ui/Button";
+import { useAutoClock } from "../../hooks/useAutoClock";
 
 import { PromptsManager } from "../PromptsManager";
 
@@ -32,6 +33,7 @@ const navItems = [
 
 export function Layout() {
   const { user, logout } = useAuth();
+  useAutoClock();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [showSignOutConfirm, setShowSignOutConfirm] = useState(false);
   const location = useLocation();
@@ -65,9 +67,12 @@ export function Layout() {
       <aside className="w-64 flex-shrink-0 glass z-20 flex-col hidden md:flex m-4 rounded-3xl overflow-hidden">
         <div className="p-6 pb-2">
           <h1 className="text-2xl font-bold tracking-tight text-indigo-600 dark:text-indigo-400 flex items-center gap-2 mb-6">
-            <div className="w-8 h-8 bg-indigo-100 dark:bg-indigo-900/50 rounded-xl flex items-center justify-center">
-              <Clock className="w-5 h-5" />
-            </div>
+            <img 
+              src="https://epublication.neocities.org/lantrack_logo.svg" 
+              alt="LanTrack Logo" 
+              className="w-8 h-8 rounded-xl object-contain"
+              referrerPolicy="no-referrer"
+            />
             LanTrack
           </h1>
         </div>
@@ -125,9 +130,12 @@ export function Layout() {
         {/* Mobile Header */}
         <header className="md:hidden flex items-center justify-between p-4 glass-panel border-b border-white/20 dark:border-white/5 z-30 sticky top-0">
           <div className="flex items-center gap-2">
-            <div className="w-8 h-8 bg-indigo-100 dark:bg-indigo-900/50 rounded-xl flex items-center justify-center text-indigo-600 dark:text-indigo-400">
-              <Clock className="w-5 h-5" />
-            </div>
+            <img 
+              src="https://epublication.neocities.org/lantrack_logo.svg" 
+              alt="LanTrack Logo" 
+              className="w-8 h-8 rounded-xl object-contain"
+              referrerPolicy="no-referrer"
+            />
             <h1 className="text-xl font-bold tracking-tight text-indigo-600 dark:text-indigo-400">
               LanTrack
             </h1>
@@ -195,9 +203,12 @@ export function Layout() {
               >
                 <div className="p-4 flex justify-between items-center border-b border-zinc-100 dark:border-zinc-800">
                   <div className="flex items-center gap-2">
-                    <div className="w-8 h-8 bg-indigo-100 dark:bg-indigo-900/50 rounded-xl flex items-center justify-center text-indigo-600 dark:text-indigo-400">
-                      <Clock className="w-5 h-5" />
-                    </div>
+                    <img 
+                      src="https://epublication.neocities.org/lantrack_logo.svg" 
+                      alt="LanTrack Logo" 
+                      className="w-8 h-8 rounded-xl object-contain"
+                      referrerPolicy="no-referrer"
+                    />
                     <h2 className="text-xl font-bold tracking-tight text-indigo-600 dark:text-indigo-400">
                       LanTrack
                     </h2>
